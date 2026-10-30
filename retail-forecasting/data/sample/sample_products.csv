@@ -1,0 +1,51 @@
+sku_id,product_name,category,subcategory,unit_cost,unit_price,supplier,lead_time_days,min_order_qty
+SKU001,Basmati Rice Premium 5kg,Food,Grains,850,1100,Shan Foods,7,50
+SKU002,Daal Masoor 1kg,Food,Daals,180,220,Shan Foods,5,100
+SKU003,Daal Chana 1kg,Food,Daals,160,195,Shan Foods,5,100
+SKU004,Daal Moong 1kg,Food,Daals,170,210,Shan Foods,5,100
+SKU005,Cooking Oil 5L,Food,Oils,950,1250,Marri,10,30
+SKU006,Whole Wheat Flour 20kg,Food,Flour,680,850,Premier,3,20
+SKU007,White Sugar 1kg,Food,Sugar,120,150,Shakarganj,5,200
+SKU008,Tea Leaves 250g,Beverages,Tea,180,230,Lipton,7,50
+SKU009,Milk Powder 500g,Beverages,Dairy,450,580,Nido,14,40
+SKU010,Salt 1kg,Food,Spices,35,45,Shan Foods,5,200
+SKU011,Red Chilli Powder 200g,Food,Spices,120,150,Shan Foods,5,100
+SKU012,Turmeric Powder 200g,Food,Spices,85,110,Shan Foods,5,100
+SKU013,Cumin Seeds 100g,Food,Spices,95,125,Shan Foods,5,100
+SKU014,Chicken Breast 1kg,Meat,Poultry,550,680,KFC Supplies,3,30
+SKU015,Mutton 1kg,Meat,Red Meat,1200,1500,Butcher Direct,3,20
+SKU016,Onions 1kg,Vegetables,Allium,60,80,Local Farm,2,100
+SKU017,Potatoes 1kg,Vegetables,Roots,40,55,Local Farm,2,150
+SKU018,Tomatoes 1kg,Vegetables,Solanaceae,80,110,Local Farm,2,100
+SKU019,Ginger 100g,Vegetables,Roots,50,70,Local Farm,3,50
+SKU020,Garlic 100g,Vegetables,Allium,40,55,Local Farm,3,50
+SKU021,Green Chilies 100g,Vegetables,Solanaceae,45,65,Local Farm,2,50
+SKU022,Laundry Soap 500g,Household,Laundry,120,150,Sunlight,10,100
+SKU023,Dish Soap 500ml,Household,Cleaning,95,125,Finish,10,100
+SKU024,Shampoo 200ml,Personal Care,Hair,250,320,Pantene,14,50
+SKU025,Toothpaste 100g,Personal Care,Oral,150,190,Colgate,14,100
+SKU026,Hand Sanitizer 250ml,Personal Care,Health,180,230,Dettol,14,50
+SKU027,Face Cream 50g,Personal Care,Skin,450,580,Ponds,21,30
+SKU028,Moisturizer 200ml,Personal Care,Skin,320,410,Nivea,21,40
+SKU029,Detergent Powder 1kg,Household,Laundry,280,350,Surf Excel,10,50
+SKU030,Battery AA 4pcs,Electronics,Accessories,180,250,Duracell,14,50
+SKU031,Toilet Paper 4 rolls,Household,Paper,250,320,Regal,7,50
+SKU032,Tissue Box 100 sheets,Household,Paper,80,110,Regal,7,100
+SKU033,Air Freshener 300ml,Household,Home Care,350,450,Glade,14,30
+SKU034,Insect Spray 400ml,Household,Home Care,420,550,Baygon,14,30
+SKU035,Aluminum Foil 30m,Household,Kitchen,280,360,Wrap,10,50
+SKU036,Cling Film 30m,Household,Kitchen,220,290,Saran,10,50
+SKU037,Match Box 10 sticks,Household,Accessories,15,25,Mysore,14,200
+SKU038,Cigarettes 10 pack,Tobacco,Cigarettes,220,280,John Player,7,50
+SKU039,Pan Masala 10 pouch,Tobacco,Pan Masala,50,70,Pan Vilas,7,100
+SKU040,Soft Drink 500ml,Beverages,Drinks,50,65,Coca Cola,5,100
+SKU041,Juice Box 200ml,Beverages,Drinks,40,55,Rooh Afza,7,100
+SKU042,Water Bottle 1.5L,Beverages,Water,30,40,Aqua,5,200
+SKU043,Energy Drink 250ml,Beverages,Drinks,120,150,Red Bull,7,50
+SKU044,Potato Chips 100g,Snacks,Chips,80,100,Lays,7,100
+SKU045,Namkeen 200g,Snacks,Namkeen,120,150,Balaji,7,100
+SKU046,Cookies 200g,Snacks,Biscuits,150,190,Parle,7,100
+SKU047,Chocolate Bar 50g,Snacks,Chocolate,80,100,Cadbury,7,100
+SKU048,Cake 500g,Snacks,Bakery,350,450,Halwa,3,20
+SKU049,Butter 250g,Dairy,Butter,280,350,Halal,5,50
+SKU050,Yogurt 500g,Dairy,Yogurt,180,230,Halal,3,50

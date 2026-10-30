@@ -1,0 +1,15 @@
+# Optional forecasting and camera inference modules for the unified app.
+lightgbm>=4,<5
+prophet>=1.1,<2
+hijri-converter>=2.3,<3
+ultralytics>=8,<9
+supervision>=0.25,<1
+opencv-python-headless>=4.8,<5
+filterpy>=1.4
+mediapipe>=0.10
+scikit-learn>=1.3
+joblib>=1.3
+pyyaml>=6
+loguru>=0.7
+watchdog>=4
+streamlit-drawable-canvas>=0.9

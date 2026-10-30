@@ -1,0 +1,4 @@
+store_id,store_name,city,area,store_type,size_sqft,opening_date
+STORE001,Gulberg Mini Market,Lahore,Gulberg,Supermarket,2500,2022-01-15
+STORE002,Model Town Express,Lahore,Model Town,Hypermarket,5000,2021-06-01
+STORE003,Cantt Convenience,Lahore,Cantt,Convenience Store,800,2023-03-10

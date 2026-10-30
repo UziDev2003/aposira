@@ -1,0 +1,1 @@
+"""APOSIRA unified retail application."""

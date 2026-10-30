@@ -1,0 +1,11 @@
+# Unified local APOSIRA workspace (optional ML/vision packages remain modular).
+streamlit>=1.38,<2
+pandas>=2.2,<3
+numpy>=1.26,<3
+plotly>=5.24,<7
+openpyxl>=3.1
+fpdf2>=2.7
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
+httpx>=0.27

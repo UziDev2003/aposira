@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.env
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.pytest_cache/
+exports/
+models/
+
+# Local application state
+*.sqlite3
+data/*.db
+config/zones_runtime/
+data/uploads/
