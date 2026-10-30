@@ -5,6 +5,11 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 PORT=8888
+PUBLIC_HOST="${APOSIRA_PUBLIC_HOST:-${RUNPOD_POD_ID:+${RUNPOD_POD_ID}-${PORT}.proxy.runpod.net}}"
+if [[ -z "$PUBLIC_HOST" ]]; then
+    echo 'Set APOSIRA_PUBLIC_HOST to your RunPod proxy hostname.' >&2
+    exit 1
+fi
 
 echo '=================================================='
 echo '       APOSIRA - RunPod Automated Setup'
@@ -74,4 +79,6 @@ exec "$PYTHON_BIN" run_aposira.py \
     --server.headless true \
     --server.enableCORS true \
     --server.enableXsrfProtection true \
+    --browser.serverAddress "$PUBLIC_HOST" \
+    --browser.serverPort 443 \
     --browser.gatherUsageStats false

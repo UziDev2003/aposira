@@ -13,12 +13,26 @@ sys.path.insert(0,str(ROOT/'retail-forecasting'))
 from aposira.commerce import Commerce
 
 st.set_page_config(page_title='APOSIRA | Retail Intelligence',page_icon='🏪',layout='wide')
+st.markdown("""<style>
+.block-container {max-width:1440px;padding-top:2rem;padding-bottom:3rem;}
+[data-testid="stAppViewContainer"] {background:#f6f8fc;}
+[data-testid="stSidebar"] {background:#fff;border-right:1px solid #e2e8f0;}
+[data-testid="stMetric"] {background:white;border:1px solid #e2e8f0;border-radius:14px;padding:20px;}
+[data-testid="stForm"] {background:white;border-radius:14px;}
+h1,h2,h3 {letter-spacing:-.025em;}
+.aposira-hero {background:linear-gradient(115deg,#102c67,#2563eb);color:white;padding:32px;border-radius:20px;margin-bottom:24px;}
+.aposira-hero h1 {color:white;font-size:2.2rem;margin:8px 0;}
+.aposira-hero p {color:#dbeafe;max-width:680px;margin:0;}
+.aposira-eyebrow {font-size:12px;font-weight:700;letter-spacing:.16em;}
+</style>""",unsafe_allow_html=True)
 commerce=Commerce(ROOT/'data/aposira.db')
 st.sidebar.title('APOSIRA')
 st.sidebar.caption('One Intelligent System for Modern Retail')
 org=st.sidebar.text_input('Organization',value='my-business',key='organization_input').strip()
 branch=st.sidebar.text_input('Branch',value='main-store',key='branch_input').strip()
-st.sidebar.caption('Local development workspace • organization selection is not authentication')
+st.sidebar.caption('Demo workspace · PKR')
+with st.sidebar.expander('About this workspace'):
+    st.caption('Organization and branch select data, not access permissions. This prototype has no login; use demonstration data.')
 if not org or not branch:
     st.info('Enter an organization and branch to continue.');st.stop()
 page=st.sidebar.radio('Workspace',['Overview','Products & Stock','POS & Orders','Fulfillment & Delivery','Customers & Loyalty','Forecasting & Inventory','Store Vision','Audit Trail'],key='workspace_page')
@@ -36,18 +50,30 @@ products=commerce.rows('products',org)
 orders=commerce.rows('orders',org,branch)
 
 if page=='Overview':
-    st.title('One Intelligent System for Modern Retail')
+    st.markdown('<div class="aposira-hero"><div class="aposira-eyebrow">APOSIRA · RETAIL INTELLIGENCE</div><h1>Your store, in one place.</h1><p>Track sales, keep stock moving, and turn store activity into better decisions.</p></div>',unsafe_allow_html=True)
     st.caption(f'{org} / {branch} • PKR')
     cols=st.columns(4)
     cols[0].metric('Completed sales',f"PKR {sum(o['total'] for o in orders if o['status']=='completed')/100:,.2f}")
     cols[1].metric('Products',len(products))
     cols[2].metric('Open orders',sum(o['status'] not in ('completed','cancelled') for o in orders))
     cols[3].metric('Customers',len(commerce.rows('customers',org)))
-    st.markdown('Manage products and stock, take payments at the POS, fulfill orders, and use sales history to plan replenishment. Store Vision provides camera analytics and a retained event timeline.')
-    st.info('Start in Products & Stock, add a product and receive stock. Then complete a POS sale or create an order. Import six months of daily sales in Forecasting & Inventory for demand predictions.')
-    st.caption('This integrated local prototype does not yet provide production authentication, payment processing, marketplace connectors, or trained shelf-product recognition.')
+    st.subheader('Your workspaces')
+    destinations=[('Products & Stock','Build your catalogue and receive inventory.'),('POS & Orders','Create a cart, record payment, and issue a receipt.'),('Fulfillment & Delivery','Move orders from picking to confirmed delivery.'),('Customers & Loyalty','Manage customers and track earned points.'),('Forecasting & Inventory','Forecast demand and plan replenishment.'),('Store Vision','Review video analytics and retained events.')]
+    def open_workspace(destination):
+        st.session_state.workspace_page=destination
+    for start in (0,3):
+        for col,(destination,description) in zip(st.columns(3),destinations[start:start+3]):
+            with col.container(border=True):
+                st.markdown(f'**{destination}**')
+                st.caption(description)
+                st.button('Open '+destination,key='open_'+destination,on_click=open_workspace,args=(destination,),use_container_width=True)
+    st.subheader('Recent orders')
     if orders:
-        st.dataframe(pd.DataFrame(orders).drop(columns=['items']),use_container_width=True)
+        recent=pd.DataFrame(orders).drop(columns=['items']).tail(10).copy()
+        recent['total']=recent['total']/100
+        st.dataframe(recent.rename(columns={'total':'Total (PKR)'}),use_container_width=True,hide_index=True)
+    else:
+        st.info('No orders yet. Add your first product and opening stock, then create a sale in POS & Orders.')
 
 elif page=='Products & Stock':
     st.title('Products & Stock')
@@ -81,7 +107,15 @@ elif page=='POS & Orders':
         qty=st.number_input('Quantity',min_value=1,value=1,step=1)
         if st.form_submit_button('Add to cart'):
             st.session_state.cart_items[sku]=st.session_state.cart_items.get(sku,0)+int(qty)
-    st.write(st.session_state.cart_items)
+    cart_rows=[]
+    for cart_sku,quantity in st.session_state.cart_items.items():
+        product=next(p for p in products if p['sku']==cart_sku)
+        cart_rows.append({'Product':product['name'],'SKU':cart_sku,'Quantity':quantity,'Unit price (PKR)':product['price']/100,'Total (PKR)':product['price']*quantity/100})
+    if cart_rows:
+        st.dataframe(cart_rows,use_container_width=True,hide_index=True)
+        st.metric('Cart total',f"PKR {sum(row['Total (PKR)'] for row in cart_rows):,.2f}")
+    else:
+        st.info('Your cart is empty. Choose a product and quantity above.')
     if st.button('Clear cart'):
         st.session_state.cart_items={};st.session_state.pop('checkout_reference',None);st.rerun()
     with st.form('checkout'):
