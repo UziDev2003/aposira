@@ -82,9 +82,17 @@ if section=='Demand Forecast':
         fig.add_scatter(x=forecast.date,y=forecast.upper_bound,line={'width':0},name='Upper bound')
         fig.add_scatter(x=forecast.date,y=forecast.lower_bound,fill='tonexty',line={'width':0},name='Nominal 95% interval')
         fig.add_scatter(x=forecast.date,y=forecast.forecast,name='Forecast')
-        st.plotly_chart(fig,use_container_width=True)
-        st.dataframe(forecast,use_container_width=True)
-        st.json(details)
+        st.plotly_chart(fig,width='stretch')
+        st.dataframe(forecast,width='stretch')
+        metrics=details['metrics']
+        metric_cols=st.columns(3)
+        metric_cols[0].metric('Mean absolute error',f"{metrics['mae']:,.2f}")
+        metric_cols[1].metric('Root mean square error',f"{metrics['rmse']:,.2f}")
+        mape=metrics.get('mape')
+        metric_cols[2].metric('Percentage error (MAPE)',f"{mape:,.1f}%" if mape is not None else 'Unavailable')
+        st.caption(f"Evaluated on {details['validation_days']} held-out days. Lower error is better.")
+        with st.expander('Model and validation details'):
+            st.json(details)
         if details['retraining_recommended']:st.warning('MAPE is unavailable or above 15%. Review the data and model before ordering.')
         st.download_button('Download forecast CSV',forecast.to_csv(index=False),'aposira-forecast.csv','text/csv')
 
@@ -112,13 +120,13 @@ elif section=='Inventory & Alerts':
         st.session_state.retail_plan=(context,pd.DataFrame([{'sku':sku,'store_id':store,**plan}]))
         if plan['status']!='Normal':st.warning(f"{plan['status']}: review replenishment. Suggested quantity: {plan['recommended_quantity']:,.0f}")
         else:st.success('Stock is above the reorder point and seven-day supply threshold.')
-        st.dataframe(st.session_state.retail_plan[1],use_container_width=True)
+        st.dataframe(st.session_state.retail_plan[1],width='stretch')
         st.caption('Recommendations use observed daily demand and your cost assumptions. They do not submit purchase orders.')
     except ValueError as e:st.error(str(e))
 
 elif section=='ABC Analysis':
     abc=calculate_abc_classification(filtered,products)
-    st.dataframe(abc,use_container_width=True)
+    st.dataframe(abc,width='stretch')
     st.caption('Value thresholds are 80% / 95%; item counts are measured, not fixed to 20% / 30% / 50%.')
     st.download_button('Export ABC CSV',abc.to_csv(index=False),'aposira-abc.csv','text/csv')
 
@@ -129,7 +137,7 @@ elif section=='Policy Simulator':
             result=InventorySimulator().compare_policies(daily_history(history),initial)
             table=pd.DataFrame({k:{m:v for m,v in result[k].items() if m!='stock_levels'} for k in ('baseline','proposed')})
             st.session_state.retail_simulation=(context,table.reset_index(names='metric'))
-            st.dataframe(table,use_container_width=True)
+            st.dataframe(table,width='stretch')
             st.line_chart(pd.DataFrame({k:result[k]['stock_levels'] for k in ('baseline','proposed')}))
             st.caption('Historical simulation with five-day lead time. Proposed uses prior-demand averages and safety stock; savings are not guaranteed.')
         except ValueError as e:st.error(str(e))

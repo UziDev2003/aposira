@@ -58,33 +58,6 @@ def _init_session():
         "last_processed_time": 0.0,
         "frame_count": 0,
         "processed_video_path": None,
-        # Advanced analytics module keys used by _get_* functions
-        "pp_enabled": True,
-        "pp_w": 0,
-        "pp_h": 0,
-        "pp_letterbox": False,
-        "pp_clahe": False,
-        "pp_clahe_clip": 2.0,
-        "pp_wb": False,
-        "pp_gamma": 1.0,
-        "pp_blur": 0,
-        "pp_sharpen": False,
-        "pp_denoise": False,
-        "pp_rgb": False,
-        "bg_enabled": False,
-        "bg_method": "MOG2",
-        "bg_history": 500,
-        "line_enabled": False,
-        "queue_enabled": False,
-        "obj_enabled": False,
-        "face_blur_enabled": False,
-        "face_blur_method": "opencv",
-        "clip_enabled": False,
-        "clip_pre": 10,
-        "clip_post": 10,
-        "pose_gesture": True,
-        "pose_fall": True,
-        "pose_fight": True,
         # Queue/live processing state
         "last_queue_status": [],
         "last_object_events": [],
@@ -96,44 +69,47 @@ def _init_session():
 
 _init_session()
 
-# Now apply the CSS after session init
-st.markdown(
-    """<style>
-/* Modern dark theme */
-.stApp { background: #0a0a1a; color: #ffffff; }
-[data-testid="stSidebar"] { background-color: #1a1a2e !important; }
-h1, h2, h3, h4, h5, h6, p, label { color: #ffffff !important; }
-.stMarkdown p { color: #ffffff !important; }
+# Standalone vision keeps its theme; embedded vision inherits APOSIRA.
+if not globals().get('APOSIRA_EMBEDDED'):
+    # Now apply the CSS after session init
+    st.markdown(
+        """<style>
+    /* Modern dark theme */
+    .stApp { background: #0a0a1a; color: #ffffff; }
+    [data-testid="stSidebar"] { background-color: #1a1a2e !important; }
+    h1, h2, h3, h4, h5, h6, p, label { color: #ffffff !important; }
+    .stMarkdown p { color: #ffffff !important; }
 
-/* Selectbox dropdown fix */
-div[data-baseweb="select"] > div { background-color: #1a1a2e; }
-div[data-baseweb="popover"] ul { background-color: #1a1a2e; }
-div[data-baseweb="popover"] li { color: #ffffff; }
-div[data-baseweb="popover"] li:hover { background-color: #00d9ff; color: #000000; }
-div[data-baseweb="popover"] li[aria-selected="true"] { background-color: #0f3460; color: #ffffff; }
+    /* Selectbox dropdown fix */
+    div[data-baseweb="select"] > div { background-color: #1a1a2e; }
+    div[data-baseweb="popover"] ul { background-color: #1a1a2e; }
+    div[data-baseweb="popover"] li { color: #ffffff; }
+    div[data-baseweb="popover"] li:hover { background-color: #00d9ff; color: #000000; }
+    div[data-baseweb="popover"] li[aria-selected="true"] { background-color: #0f3460; color: #ffffff; }
 
-/* Modal / Exception dialog fix */
-div[data-baseweb="modal"] section { background-color: #1a1a2e !important; color: #ffffff !important; }
-div[data-baseweb="modal"] div { color: #ffffff; }
+    /* Modal / Exception dialog fix */
+    div[data-baseweb="modal"] section { background-color: #1a1a2e !important; color: #ffffff !important; }
+    div[data-baseweb="modal"] div { color: #ffffff; }
 
-.stMetric>div:first-child{color:#00d9ff!important;font-size:1.5rem!important}
-.stMetric>div:nth-child(2){color:#ffffff!important}
-.zone{background:#0f3460;color:#ffffff;padding:10px;border-radius:8px;margin:5px 0}
-.severity-LOW{color:#3b82f6;font-weight:bold}
-.severity-MEDIUM{color:#f59e0b;font-weight:bold}
-.severity-HIGH{color:#ef4444;font-weight:bold}
-.severity-CRITICAL{color:#7c2d12;font-weight:bold}
-/* Card style for results */
-.result-card{background:#1a1a2e;border-radius:12px;padding:20px;margin:10px 0;border:1px solid #2a2a4a}
-.stButton>button{background:#0f3460;color:white;border-radius:8px;border:none;padding:8px 20px}
-.stButton>button:hover{background:#1a4a8a}
-/* Tabs and expanders */
-.stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
-.streamlit-expanderHeader { color: #ffffff !important; }
-[data-testid="stExpander"] details summary p { color: #ffffff !important; }
-</style>""",
-    unsafe_allow_html=True,
-)
+    .stMetric>div:first-child{color:#00d9ff!important;font-size:1.5rem!important}
+    .stMetric>div:nth-child(2){color:#ffffff!important}
+    .zone{background:#0f3460;color:#ffffff;padding:10px;border-radius:8px;margin:5px 0}
+    .severity-LOW{color:#3b82f6;font-weight:bold}
+    .severity-MEDIUM{color:#f59e0b;font-weight:bold}
+    .severity-HIGH{color:#ef4444;font-weight:bold}
+    .severity-CRITICAL{color:#7c2d12;font-weight:bold}
+    /* Card style for results */
+    .result-card{background:#1a1a2e;border-radius:12px;padding:20px;margin:10px 0;border:1px solid #2a2a4a}
+    .stButton>button{background:#0f3460;color:white;border-radius:8px;border:none;padding:8px 20px}
+    .stButton>button:hover{background:#1a4a8a}
+    /* Tabs and expanders */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p { color: #ffffff !important; }
+    .streamlit-expanderHeader { color: #ffffff !important; }
+    [data-testid="stExpander"] details summary p { color: #ffffff !important; }
+    </style>""",
+        unsafe_allow_html=True,
+    )
+
 
 # Add path for local imports
 import sys
@@ -833,7 +809,7 @@ with tab_live:
             )
 
             # Process button
-            if st.button("▶️ Process Video", type="primary", use_container_width=True):
+            if st.button("▶️ Process Video", type="primary", width='stretch'):
                 try:
                     det = get_det(ms, cf, dv)
                 except Exception as e:
@@ -975,7 +951,7 @@ with tab_live:
                                 f,
                                 file_name=f"processed_{up.name}",
                                 mime="video/mp4",
-                                use_container_width=True,
+                                width='stretch',
                             )
                     else:
                         st.error("⚠️ Processed video file not available for download")
@@ -1037,11 +1013,11 @@ with tab_live:
             b1, b2 = st.columns(2)
             with b1:
                 start_enabled = video_source is not None
-                if st.button("▶️ Start", type="primary", use_container_width=True,
+                if st.button("▶️ Start", type="primary", width='stretch',
                              key="start_live", disabled=not start_enabled):
                     st.session_state["run"] = True
             with b2:
-                if st.button("⏹️ Stop", use_container_width=True, key="stop_live"):
+                if st.button("⏹️ Stop", width='stretch', key="stop_live"):
                     st.session_state["run"] = False
 
             fp = st.empty()
@@ -1480,7 +1456,7 @@ with tab_dash:
                     f,
                     file_name="processed_video.mp4",
                     mime="video/mp4",
-                    use_container_width=True,
+                    width='stretch',
                 )
         except Exception as e:
             st.error(f"Could not load processed video: {e}")

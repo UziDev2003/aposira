@@ -66,12 +66,12 @@ if page=='Overview':
             with col.container(border=True):
                 st.markdown(f'**{destination}**')
                 st.caption(description)
-                st.button('Open '+destination,key='open_'+destination,on_click=open_workspace,args=(destination,),use_container_width=True)
+                st.button('Open '+destination,key='open_'+destination,on_click=open_workspace,args=(destination,),width='stretch')
     st.subheader('Recent orders')
     if orders:
         recent=pd.DataFrame(orders).drop(columns=['items']).tail(10).copy()
         recent['total']=recent['total']/100
-        st.dataframe(recent.rename(columns={'total':'Total (PKR)'}),use_container_width=True,hide_index=True)
+        st.dataframe(recent.rename(columns={'total':'Total (PKR)'}),width='stretch',hide_index=True)
     else:
         st.info('No orders yet. Add your first product and opening stock, then create a sale in POS & Orders.')
 
@@ -86,7 +86,7 @@ elif page=='Products & Stock':
                 commerce.product(org,sku,name,round(price*100),round(cost*100));st.rerun()
             except ValueError as e:st.error(str(e))
     if products:
-        st.dataframe(pd.DataFrame([{**p,**commerce.stock(org,branch,p['sku']),'price':p['price']/100,'cost':p['cost']/100} for p in products]),use_container_width=True)
+        st.dataframe(pd.DataFrame([{**p,**commerce.stock(org,branch,p['sku']),'price':p['price']/100,'cost':p['cost']/100} for p in products]),width='stretch')
         with st.form('stock'):
             sku=st.selectbox('Product',[p['sku'] for p in products])
             qty=st.number_input('Quantity change (negative for removal)',value=1,step=1)
@@ -96,7 +96,7 @@ elif page=='Products & Stock':
                 try:
                     commerce.movement(org,branch,sku,int(qty),reason,reference);st.rerun()
                 except ValueError as e:st.error(str(e))
-        st.dataframe(commerce.rows('movements',org,branch),use_container_width=True)
+        st.dataframe(commerce.rows('movements',org,branch),width='stretch')
 
 elif page=='POS & Orders':
     st.title('POS & Orders')
@@ -112,7 +112,7 @@ elif page=='POS & Orders':
         product=next(p for p in products if p['sku']==cart_sku)
         cart_rows.append({'Product':product['name'],'SKU':cart_sku,'Quantity':quantity,'Unit price (PKR)':product['price']/100,'Total (PKR)':product['price']*quantity/100})
     if cart_rows:
-        st.dataframe(cart_rows,use_container_width=True,hide_index=True)
+        st.dataframe(cart_rows,width='stretch',hide_index=True)
         st.metric('Cart total',f"PKR {sum(row['Total (PKR)'] for row in cart_rows):,.2f}")
     else:
         st.info('Your cart is empty. Choose a product and quantity above.')
@@ -156,7 +156,7 @@ elif page=='Fulfillment & Delivery':
             if st.form_submit_button('Update order'):
                 try:commerce.transition(org,branch,selected,status,rider,proof,collected);st.rerun()
                 except ValueError as e:st.error(str(e))
-    if orders:st.dataframe(pd.DataFrame(orders).drop(columns=['items']),use_container_width=True)
+    if orders:st.dataframe(pd.DataFrame(orders).drop(columns=['items']),width='stretch')
 
 elif page=='Customers & Loyalty':
     st.title('Customers & Loyalty')
@@ -167,7 +167,7 @@ elif page=='Customers & Loyalty':
             except ValueError as e:st.error(str(e))
     points=commerce.rows('loyalty',org)
     st.caption('Earn one point per PKR 100 on completed orders. Redemption and refunds are not yet implemented.')
-    st.dataframe([{**c,'points':sum(p['points'] for p in points if p['customer']==c['customer'])} for c in commerce.rows('customers',org)],use_container_width=True)
+    st.dataframe([{**c,'points':sum(p['points'] for p in points if p['customer']==c['customer'])} for c in commerce.rows('customers',org)],width='stretch')
 
 elif page=='Forecasting & Inventory':
     runpy.run_path(str(ROOT/'retail-forecasting/dashboard/app.py'),init_globals={'APOSIRA_EMBEDDED':True})
@@ -186,5 +186,5 @@ elif page=='Store Vision':
 else:
     st.title('Audit Trail')
     rows=commerce.rows('audit',org,branch)
-    st.dataframe(rows,use_container_width=True)
+    st.dataframe(rows,width='stretch')
     st.download_button('Export audit CSV',pd.DataFrame(rows).to_csv(index=False),'aposira-audit.csv','text/csv')

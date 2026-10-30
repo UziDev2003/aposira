@@ -496,7 +496,7 @@ def _render_opencv_editor_button(frame: np.ndarray, existing_zones: List[Zone],
                                    cam: str) -> Optional[List[Zone]]:
     """Render a button to launch the OpenCV interactive editor."""
     if st.button("🖱️ Open Interactive Zone Editor (OpenCV window)",
-                 use_container_width=True, type="primary"):
+                 width='stretch', type="primary"):
         out_file = tempfile.mktemp(suffix=".json", prefix="zones_")
         result_file = _run_opencv_editor(frame, existing_zones, default_type, out_file)
         if result_file and Path(result_file).exists():
@@ -613,11 +613,11 @@ def render(camera_id="cam_01", video_path=None, existing_zones=None, on_save=Non
     # --- Save / Clear / Load buttons ---
     col1, col2, col3 = st.columns(3)
     with col1:
-        save_clicked = st.button("💾 Save Zones", type="primary", use_container_width=True)
+        save_clicked = st.button("💾 Save Zones", type="primary", width='stretch')
     with col2:
-        clear_clicked = st.button("🗑️ Clear All Zones", use_container_width=True)
+        clear_clicked = st.button("🗑️ Clear All Zones", width='stretch')
     with col3:
-        load_runtime_clicked = st.button("📂 Load Saved", use_container_width=True)
+        load_runtime_clicked = st.button("📂 Load Saved", width='stretch')
 
     saved_to = None
     if save_clicked and zones_final:

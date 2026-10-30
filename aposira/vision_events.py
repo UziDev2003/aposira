@@ -22,7 +22,7 @@ def render_timeline(root, org, branch):
                      camera_id=camera or None,search=search,include_acknowledged=not unack)
     if not rows:st.info('No matching events. Run a camera or video through Store Vision to record events.');return
     frame=pd.DataFrame(rows)
-    st.dataframe(frame,use_container_width=True)
+    st.dataframe(frame,width='stretch')
     st.download_button('Export filtered events CSV',frame.to_csv(index=False),'aposira-events.csv','text/csv')
     event_id=st.selectbox('Event to acknowledge',[r['alert_id'] for r in rows])
     if st.button('Acknowledge event'):

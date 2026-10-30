@@ -89,3 +89,5 @@ tail -f /workspace/aposira-runpod.log
 ```
 
 Use `Ctrl+C` to stop following the log; the background application keeps running. After a successful first installation, `APOSIRA_INSTALL=0 bash run_runpod.sh` reuses the environment. Stop an already running APOSIRA process before launching another instance.
+
+The RunPod launcher derives the public proxy hostname from `RUNPOD_POD_ID` and keeps CORS/XSRF enabled. For a custom hostname, set `APOSIRA_PUBLIC_HOST=your-hostname` before launching. Use the HTTPS proxy URL from RunPod, even if Streamlit logs an HTTP URL with port 443.
