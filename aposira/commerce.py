@@ -24,7 +24,7 @@ class Commerce:
             CREATE TABLE IF NOT EXISTS customers(org TEXT, customer TEXT, name TEXT, PRIMARY KEY(org,customer));
             CREATE TABLE IF NOT EXISTS orders(id TEXT PRIMARY KEY, org TEXT, branch TEXT, source TEXT,
                 customer TEXT, items TEXT, total INTEGER, payment TEXT, status TEXT, rider TEXT DEFAULT '',
-                proof TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+                proof TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP, completed_at TEXT);
             CREATE TABLE IF NOT EXISTS loyalty(id INTEGER PRIMARY KEY, org TEXT, customer TEXT, points INTEGER, reference TEXT UNIQUE);
             CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, org TEXT, branch TEXT, action TEXT,
                 reference TEXT, detail TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -33,6 +33,10 @@ class Commerce:
             CREATE TRIGGER IF NOT EXISTS no_movement_delete BEFORE DELETE ON movements
                 BEGIN SELECT RAISE(ABORT, 'Append a correcting movement'); END;
             ''')
+            try:
+                db.execute('ALTER TABLE orders ADD COLUMN completed_at TEXT')
+            except sqlite3.OperationalError:
+                pass
 
     def connect(self):
         db = sqlite3.connect(self.path, timeout=30)
@@ -115,9 +119,11 @@ class Commerce:
                 items.append({'sku':sku,'name':p['name'],'quantity':quantity,'price':p['price']})
             total=sum(i['price']*i['quantity'] for i in items)
             status='completed' if source=='pos' else 'received'
-            db.execute('INSERT INTO orders(id,org,branch,source,customer,items,total,payment,status) VALUES(?,?,?,?,?,?,?,?,?)',(order_id,org,branch,source,customer,json.dumps(items),total,payment,status))
             if status=='completed':
+                db.execute('INSERT INTO orders(id,org,branch,source,customer,items,total,payment,status,completed_at) VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)',(order_id,org,branch,source,customer,json.dumps(items),total,payment,status))
                 self._fulfill(db,org,branch,order_id,items,customer,total)
+            else:
+                db.execute('INSERT INTO orders(id,org,branch,source,customer,items,total,payment,status) VALUES(?,?,?,?,?,?,?,?,?)',(order_id,org,branch,source,customer,json.dumps(items),total,payment,status))
             db.execute('INSERT INTO audit(org,branch,action,reference,detail) VALUES(?,?,?,?,?)',(org,branch,'order_created',order_id,status))
         return order_id
 
@@ -142,7 +148,7 @@ class Commerce:
                 if row['payment']=='cod' and not cod_collected:
                     raise ValueError('Confirm cash collection before completing this order')
                 self._fulfill(db,org,branch,order_id,json.loads(row['items']),row['customer'],row['total'])
-            db.execute('UPDATE orders SET status=?,rider=?,proof=? WHERE id=?',(status,rider or row['rider'],proof or row['proof'],order_id))
+            db.execute('UPDATE orders SET status=?,rider=?,proof=?,completed_at=CASE WHEN ?="completed" THEN CURRENT_TIMESTAMP ELSE completed_at END WHERE id=?',(status,rider or row['rider'],proof or row['proof'],status,order_id))
             db.execute('INSERT INTO audit(org,branch,action,reference,detail) VALUES(?,?,?,?,?)',(org,branch,'order_status',order_id,status))
 
     def rows(self, table, org, branch=None):
@@ -163,7 +169,8 @@ class Commerce:
         rows=[]
         for order in self.rows('orders',org,branch):
             if order['status']=='completed':
+                sale_date=(order.get('completed_at') or order['created_at'])[:10]
                 for i in json.loads(order['items']):
-                    rows.append({'date':order['created_at'][:10], 'sku':i['sku'], 'store_id':branch,
+                    rows.append({'date':sale_date, 'sku':i['sku'], 'store_id':branch,
                                  'sales_qty':i['quantity'], 'unit_price':i['price']/100, 'promotion_flag':0})
         return pd.DataFrame(rows,columns=['date','sku','store_id','sales_qty','unit_price','promotion_flag'])

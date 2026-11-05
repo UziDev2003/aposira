@@ -1,0 +1,290 @@
+[
+  {
+    "id": "AP-01",
+    "title": "Scope context",
+    "source": "I Organization and Store Management",
+    "status": "Partial",
+    "priority": "P0",
+    "statement": "The platform shall scope operations by organization and, where applicable, branch.",
+    "accept": "Products and customers are shared within an organization; orders, movements and events are branch-scoped. Switching branch clears prior cart and camera session state. Authorized membership enforcement is required for R1."
+  },
+  {
+    "id": "AP-02",
+    "title": "Identity and access",
+    "source": "I Authentication Roles and Security; G1 2.5.3; G2 2.5.3",
+    "status": "Planned",
+    "priority": "P0",
+    "statement": "The pilot shall authenticate users and enforce role and branch permissions on every protected operation.",
+    "accept": "Deny anonymous and unauthorized access server-side; test session expiry, logout, recovery, administrator MFA and cross-tenant object IDs. Provider choice is pending."
+  },
+  {
+    "id": "AP-03",
+    "title": "Product catalogue",
+    "source": "I Product and Catalogue Management",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "The platform shall maintain unique organization SKU, name, selling price and unit cost.",
+    "accept": "Reject blank identifiers and negative prices; store monetary values as integer paisa. Variants, barcodes, taxes, units, batches, expiry and channel prices require later acceptance cases."
+  },
+  {
+    "id": "AP-04",
+    "title": "Stock ledger",
+    "source": "I Inventory and Warehouse Management",
+    "status": "Implemented",
+    "priority": "P0",
+    "statement": "Stock changes shall append signed movements with quantity, reason and unique reference.",
+    "accept": "Reject zero/noninteger quantity, unknown SKU and reductions below reservations. Repeating the same reference and payload is a no-op; a different payload fails. SQL UPDATE/DELETE of movements fails."
+  },
+  {
+    "id": "AP-05",
+    "title": "Reservations",
+    "source": "I Inventory and Warehouse Management; Omnichannel Order Management",
+    "status": "Implemented",
+    "priority": "P0",
+    "statement": "Uncompleted, uncancelled orders shall reserve stock and reduce available-to-sell quantity.",
+    "accept": "On-hand equals signed movement sum; available equals on-hand minus active reservations. Two competing orders cannot oversell. Failed delivery retains reservation until completion or cancellation."
+  },
+  {
+    "id": "AP-06",
+    "title": "Checkout",
+    "source": "I Advanced Smart POS",
+    "status": "Partial",
+    "priority": "P0",
+    "statement": "Checkout shall validate each cart item and commit order, stock deduction, loyalty and audit atomically for a completed POS sale.",
+    "accept": "Empty carts, nonpositive quantities, insufficient stock and POS COD fail without partial writes. Retry returns the original order only when its original payload matches. Advanced POS features are AP-27."
+  },
+  {
+    "id": "AP-07",
+    "title": "Payment record",
+    "source": "I Advanced Smart POS Payment methods",
+    "status": "Partial",
+    "priority": "P0",
+    "statement": "R0 shall record cash, externally paid or COD arrangements without storing payment-card secrets.",
+    "accept": "Require operator confirmation in the UI; reject COD for immediate POS checkout. External paid means a recorded external payment, not gateway verification. Signed provider confirmation is required in R2."
+  },
+  {
+    "id": "AP-08",
+    "title": "Order fulfillment",
+    "source": "I Omnichannel Order Management; Delivery Management",
+    "status": "Partial",
+    "priority": "P0",
+    "statement": "Orders shall progress through the permitted state machine and maintain reservations until resolved.",
+    "accept": "Reject skipped states. Dispatch requires rider text; completion from dispatched requires proof; COD completion requires collection confirmation. GPS, rider accounts and cash settlement remain planned."
+  },
+  {
+    "id": "AP-09",
+    "title": "Customer loyalty",
+    "source": "I Customer and Loyalty Management",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "The platform shall register organization-scoped customers and accrue points on completed orders.",
+    "accept": "Unknown customer is rejected at checkout. Award floor(total paisa / 10000) points once per order. Redemption, tiers, consent, segmentation, refunds and rewards remain planned."
+  },
+  {
+    "id": "AP-10",
+    "title": "Audit and attribution",
+    "source": "I Administration Reliability and System Operations; G1 2.5.3",
+    "status": "Partial",
+    "priority": "P0",
+    "statement": "State-changing business actions shall be auditable with scope, time, reference and actor.",
+    "accept": "Existing order create/transition records are transactional. R1 must add authenticated actor, override justification, configuration/catalogue actions and access-controlled retention; stock reasons alone do not provide complete audit coverage."
+  },
+  {
+    "id": "AP-11",
+    "title": "Sales import",
+    "source": "G1 REQ-SF1-1 and 2.5.5",
+    "status": "Implemented",
+    "priority": "P1",
+    "statement": "Forecast intake shall accept CSV/JSON with date, sku, store_id, sales_qty, unit_price and promotion_flag, supporting SKU/price aliases.",
+    "accept": "Reject invalid dates, missing identifiers, negative numeric values and nonbinary flags. Validate six calendar months per group for forecasting. Rejected import must not overwrite usable history."
+  },
+  {
+    "id": "AP-12",
+    "title": "Daily history",
+    "source": "G1 2.2.7 and 2.5.5",
+    "status": "Implemented",
+    "priority": "P1",
+    "statement": "Forecasting shall operate on a single SKU/store with continuous daily observations.",
+    "accept": "Aggregate same-day sales; do not silently fill unknown dates with zero. Require explicit zero-sales rows. Reject mixed groups and history shorter than six months. Report source and selected group."
+  },
+  {
+    "id": "AP-13",
+    "title": "Forecast generation",
+    "source": "G1 REQ-SF1-2",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "The product shall generate nonnegative forecasts for 7, 14 or 30 days using the approved model baseline.",
+    "accept": "Current seasonal naive, LightGBM, Prophet and equal-weight ensemble produce dates after the last observation. ARIMA/LSTM specified in G1 are absent; revision requires approval. Missing model dependency produces a clear error."
+  },
+  {
+    "id": "AP-14",
+    "title": "Model evaluation",
+    "source": "G1 REQ-SF1-3",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Every forecast shall show holdout MAE/RMSE/MAPE and clearly labeled nominal uncertainty intervals.",
+    "accept": "Keep final 30 days out of evaluation training. MAPE excludes zero actuals and is unavailable if all are zero. Current intervals use residual quantiles; measured 95% coverage is not established."
+  },
+  {
+    "id": "AP-15",
+    "title": "Retraining and review",
+    "source": "G1 REQ-SF1-4",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "The system shall flag poor model quality and provide a controlled retraining workflow.",
+    "accept": "Current generation trains on demand and warns for MAPE above 15% or unavailable. Scheduled change detection, durable model versions, automated retraining and rollback need implementation and failure/replay tests."
+  },
+  {
+    "id": "AP-16",
+    "title": "Inventory decisions",
+    "source": "G1 REQ-SF2-1 to REQ-SF2-3 and REQ-SF3-2",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "The system shall compute EOQ, safety stock, reorder point and days of supply from history, stock and explicit costs.",
+    "accept": "Reject invalid/nonfinite costs and lead times; flag stock below reorder point or under seven days supply. Zero demand returns no numeric days-of-supply. Promotion/overstock-risk alerts are not complete."
+  },
+  {
+    "id": "AP-17",
+    "title": "ABC classification",
+    "source": "G1 REQ-SF2-4 and 2.5.5",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "ABC classification shall rank SKU revenue using cumulative value thresholds of 80% and 95%.",
+    "accept": "Top SKU remains A even when crossing 80%; item percentages are measured, not forced. Quarterly scheduling is pending. Record this interpretation as a clarification of the original fixed item-share wording."
+  },
+  {
+    "id": "AP-18",
+    "title": "Scenario analysis",
+    "source": "G1 REQ-SF3-3",
+    "status": "Partial",
+    "priority": "P2",
+    "statement": "Decision support shall distinguish historical inventory-policy simulation from price or promotion scenario modeling.",
+    "accept": "Current simulator counts each arrival once and unmet demand as shortage, using prior data for default rules. Price elasticity, promotional counterfactuals and causal savings claims require separate implementation and validation."
+  },
+  {
+    "id": "AP-19",
+    "title": "Reporting",
+    "source": "G1 REQ-SF3-1 and REQ-SF3-4; I Unified Analytics",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Reports shall identify scope, period, units, source and model where relevant and export real CSV, XLSX or PDF.",
+    "accept": "Verify signatures and readable output. Sales/ABC filters apply date ranges; saved forecast/plan/simulation exports use saved analysis. Full turnover charts and configurable branding remain pending."
+  },
+  {
+    "id": "AP-20",
+    "title": "Video perception",
+    "source": "G2 REQ-SF1-1 to REQ-SF1-4",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Vision shall process authorized video/RTSP sources and pass timestamped boxes and anonymous track IDs to analytics.",
+    "accept": "Current YOLO/ByteTrack implementation must pass camera disconnect and model failure tests. DeepSORT, 1\u201316 stream capacity, 95% mAP and MOTA targets are unverified or unmet as specified."
+  },
+  {
+    "id": "AP-21",
+    "title": "Zones and movement",
+    "source": "G2 REQ-SF2-1 to REQ-SF2-4",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Users shall configure camera polygons and review zone occupancy, dwell and heatmaps.",
+    "accept": "Persist camera zones within scope and reject invalid polygons. Test known trajectories at boundaries. Fixed 15-minute/hour/day aggregation and 90% dwell accuracy require separate evaluation."
+  },
+  {
+    "id": "AP-22",
+    "title": "Activity alerts",
+    "source": "G2 REQ-SF3-1 to REQ-SF3-4",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Vision shall produce reviewable loitering, restricted-zone and shelf-interaction observations using configurable thresholds.",
+    "accept": "Evaluate threshold crossings and cooldown on labeled clips. Default source targets include 120-second loitering and 30-second shelf interaction. Dedicated unattended-staff checkout after 60 seconds is planned."
+  },
+  {
+    "id": "AP-23",
+    "title": "Event timeline",
+    "source": "G2 REQ-SF4-2",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Events shall support scoped date/camera/text filters and durable acknowledgement with 30-day metadata retention.",
+    "accept": "Storage acknowledgement must survive reopening. UI must read acknowledged_at consistently; current UI reads acknowledged and needs correction. Query excludes expired events; pruning occurs on initialization/save, not a timer."
+  },
+  {
+    "id": "AP-24",
+    "title": "Evidence and delivery",
+    "source": "G2 REQ-SF4-1 REQ-SF4-3 REQ-SF4-4",
+    "status": "Partial",
+    "priority": "P1",
+    "statement": "Alerts shall expose available evidence and export authorized event records; real-time delivery shall be measured.",
+    "accept": "Filtered CSV exists. Snapshot/video retention, full vision PDF reports, push delivery under 500 ms and simultaneous-user access require implementation or validation. Streamlit WebSocket transport alone is not an event delivery SLA."
+  },
+  {
+    "id": "AP-25",
+    "title": "Supplier purchasing",
+    "source": "I Supplier and Purchase Management",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "The platform shall manage suppliers, approvals, purchase orders, receiving, costs, returns and balances.",
+    "accept": "Partial receipts create only the received stock movement; duplicate receipts do not duplicate inventory. Recommended orders require authorized human approval and reconciliation to supplier invoice."
+  },
+  {
+    "id": "AP-26",
+    "title": "Warehouses and transfers",
+    "source": "I Inventory and Warehouse Management",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "The platform shall support locations, stock counts, transfer states, batches, expiry and valuation.",
+    "accept": "A transfer records paired source/destination movements with in-transit status and exception handling. Count corrections preserve history; damaged/expired stock cannot silently become sellable."
+  },
+  {
+    "id": "AP-27",
+    "title": "Advanced POS",
+    "source": "I Advanced Smart POS",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "POS shall support approved discounts, shifts, receipts, returns, hardware and offline reconciliation as separate capabilities.",
+    "accept": "Manager override is attributed; returns cannot exceed original sold quantity; offline replay is idempotent. Barcode/scale/printer compatibility and tax calculations require explicit device and jurisdiction acceptance."
+  },
+  {
+    "id": "AP-28",
+    "title": "External orders and delivery",
+    "source": "I Omnichannel Order Management; Delivery Management",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "Official connectors shall import orders, synchronize availability and reconcile delivery/payment states.",
+    "accept": "Authenticate webhook origin, deduplicate provider event IDs, handle out-of-order updates and record settlement differences. Merchant API access is a prerequisite; do not infer it from a provider name."
+  },
+  {
+    "id": "AP-29",
+    "title": "Storefront and social commerce",
+    "source": "I Web Mobile App and Social Commerce",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "Customer channels shall offer catalogue, checkout, order status and permitted communications.",
+    "accept": "Public customers cannot see another account or branch inventory beyond policy. Price, stock and consent are validated server-side. Social publishing and campaign attribution require approved APIs and opt-in rules."
+  },
+  {
+    "id": "AP-30",
+    "title": "Shelf and interest intelligence",
+    "source": "I Shelf and Customer Interest Intelligence",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "The platform shall relate anonymous zone/product interactions to shelf observations and aggregate sales.",
+    "accept": "Define zone-to-SKU mappings and labeled product-facing data; measure gaps/misplacement precision. Aggregate interest-to-purchase with time/window rules; never equate anonymous tracks with identified customers."
+  },
+  {
+    "id": "AP-31",
+    "title": "Context signals and risk",
+    "source": "I Forecasting and Decision Intelligence",
+    "status": "Planned",
+    "priority": "P2",
+    "statement": "Approved weather, holiday, trend and sensor inputs shall be versioned, time-aligned and evaluated before influencing recommendations.",
+    "accept": "Use only information available at prediction time. Missing feeds degrade gracefully. Pest outputs are inspection-risk recommendations, never confirmation. Staffing, delivery and cash-flow forecasts need separate targets."
+  },
+  {
+    "id": "AP-32",
+    "title": "Platform administration",
+    "source": "I Organization and Store Management; Administration Reliability and System Operations",
+    "status": "Planned",
+    "priority": "P1",
+    "statement": "Administrators shall manage branch configuration, devices, feature flags, credentials, retention and service health.",
+    "accept": "Scope settings to authorized tenants; redact credentials; log changes. Subscription plans, business registration, operating hours, warehouses and device registration are not supplied by free-text selectors."
+  }
+]

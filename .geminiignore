@@ -1,0 +1,68 @@
+# Gemini / Antigravity Agent Ignore File (.geminiignore)
+# Excludes heavy data, models, binaries, and caches from context indexing to save tokens.
+
+# Large datasets & raw sales data (110k lines)
+*.csv
+!aposira/forecasting/data/sample/sample_stores.csv
+!aposira/forecasting/data/sample/sample_products.csv
+aposira/forecasting/data/sample/sample_sales.csv
+data/
+**/data/
+
+# Databases and binary state
+*.db
+*.sqlite*
+*.sqlite3
+
+# Model weights & binary artifacts
+*.pt
+*.onnx
+*.weights
+*.bin
+*.safetensors
+*.engine
+*.pkl
+*.joblib
+models/
+**/models/
+
+# Generated exports and reports
+exports/
+**/exports/
+reports/
+**/reports/
+*.xlsx
+*.pdf
+
+# Media (videos and images)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.jpg
+*.jpeg
+*.png
+snapshots/
+**/snapshots/
+uploads/
+**/uploads/
+
+# Virtual environments & caches
+.venv/
+.venv-*/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Jupyter notebooks
+*.ipynb
+
+# Logs
+*.log
+logs/
+

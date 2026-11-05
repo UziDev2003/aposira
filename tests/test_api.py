@@ -2,8 +2,8 @@ import tempfile
 from pathlib import Path
 from fastapi.testclient import TestClient
 import pandas as pd
-from backend import main
-from backend.database import Database
+from aposira.forecasting.backend import main
+from aposira.forecasting.backend.database import Database
 
 
 def test_upload_forecast_export_and_errors():

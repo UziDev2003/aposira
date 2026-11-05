@@ -37,22 +37,24 @@ Forecasting provides 7/14/30-day horizons, held-out MAE/RMSE/MAPE, nominal 95% r
 
 ## Structure and storage
 
+For a complete system map, subsystem breakdown, and token optimization guide, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 - `aposira/app.py`: combined Streamlit entry point and shared navigation.
 - `aposira/commerce.py`: transactional product, customer, order, reservation, stock movement, loyalty and audit storage.
-- `retail-forecasting/`: forecasting, optimization, exports and the legacy standalone API.
-- `SmartStoreVisionAI/`: existing computer vision pipeline and persistent event storage.
+- `aposira/ui.py`: shared APOSIRA design system and UI components.
+- `aposira/forecasting/`: forecasting, optimization, exports and the standalone API.
+- `aposira/vision/`: computer vision pipeline, zone editor, and persistent event storage.
 - `data/aposira.db`: local commerce state. Organizations and branches are query scopes, not access controls.
-- `SmartStoreVisionAI/data/events.sqlite3`: scoped event metadata, retained for 30 days.
-- `SmartStoreVisionAI/data/uploads/`: video uploads grouped by a hash of organization/branch.
-- `SmartStoreVisionAI/data/snapshots/`: evidence snapshots. Automatic snapshot deletion is not implemented; configure an appropriate storage/retention process before using real footage.
+- `aposira/vision/data/events.sqlite3`: scoped event metadata, retained for 30 days.
+- `aposira/vision/data/uploads/`: video uploads grouped by a hash of organization/branch.
+- `aposira/vision/data/snapshots/`: evidence snapshots. Automatic snapshot deletion is not implemented; configure an appropriate storage/retention process before using real footage.
 
-This repository includes both projects as ordinary source directories, together with the shared application. The original repositories and their histories remain separate in the development workspace.
+This repository includes both forecasting and vision pipelines directly under the `aposira` package, sharing a single cohesive theme and UI design.
 
 ## Verification
 
 ```bash
-.venv/bin/python -m pytest tests -q
-PYTHONPATH=SmartStoreVisionAI .venv/bin/python -m pytest SmartStoreVisionAI/tests -q
+.venv/bin/python -m pytest -v
 ```
 
 The root suite exercises checkout idempotency, stock reservations, fulfillment transitions, branch isolation, immutable stock movements, forecast validation, simulator conservation, exports, retained alerts, and dashboard navigation/checkout. It uses temporary databases rather than production records.
@@ -78,7 +80,7 @@ bash run_runpod.sh
 
 Without GitHub CLI, run `git clone https://github.com/UziDev2003/aposira.git` in `/workspace`. At the prompts use your GitHub username and a fine-grained personal access token restricted to this repository with Contents read permission as the password. Never place the token in the URL or a committed file.
 
-The root setup script installs dependencies, stops Jupyter, and starts the combined app on port 8888. Open the Pod's HTTP port 8888 link. This app has no login; use demonstration data on the public proxy. Run the root script, not the older script inside SmartStoreVisionAI.
+The root setup script installs dependencies, stops Jupyter, and starts the combined app on port 8888. Open the Pod's HTTP port 8888 link. This app has no login; use demonstration data on the public proxy. Run the root script, not the older script inside aposira/vision.
 
 To keep it running after disconnecting:
 

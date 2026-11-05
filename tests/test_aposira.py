@@ -7,14 +7,14 @@ from uuid import uuid4
 import pandas as pd
 import numpy as np
 ROOT=Path(__file__).resolve().parents[1]
-sys.path[:0]=[str(ROOT),str(ROOT/'retail-forecasting'),str(ROOT/'SmartStoreVisionAI')]
+sys.path.insert(0,str(ROOT))
 from aposira.commerce import Commerce
-from backend.core.data_validator import DataValidator
-from backend.core.decision_service import forecast_sales,inventory_plan
-from backend.core.optimization.simulator import InventorySimulator
-from backend.core.stock_ledger import StockLedger
-from backend.core.reports import export_table
-from src.alerts.event_store import EventStore
+from aposira.forecasting.backend.core.data_validator import DataValidator
+from aposira.forecasting.backend.core.decision_service import forecast_sales,inventory_plan
+from aposira.forecasting.backend.core.optimization.simulator import InventorySimulator
+from aposira.forecasting.backend.core.stock_ledger import StockLedger
+from aposira.forecasting.backend.core.reports import export_table
+from aposira.vision.src.alerts.event_store import EventStore
 
 
 def history():

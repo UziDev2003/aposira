@@ -1,18 +1,27 @@
-.venv/
-.venv-runpod/
+# Bytecode and runtime caches
 __pycache__/
+*.py[cod]
 .pytest_cache/
-/data/
-*.pyc
+
+# Virtual environments
+.venv/
+.venv*/
+env/
+venv/
+
+# Secrets and environment files
 .env*
 !.env.example
 secrets.toml
-*.db
-*.sqlite*
-*.pt
-*.onnx
 *.pem
 *.key
+
+# Local runtime database files
+*.db
+*.sqlite*
+
+# Logs and system artifacts
 *.log
 .DS_Store
+Thumbs.db
 .commandcode/

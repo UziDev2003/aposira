@@ -1,0 +1,68 @@
+# AI & Search Tool Ignore File (.ignore)
+# Used by ripgrep (rg), code indexing, and search tools to prevent burning tokens on massive data/binary files.
+
+# Large datasets & raw sales data (e.g. 110,000-line CSVs)
+*.csv
+!aposira/forecasting/data/sample/sample_stores.csv
+!aposira/forecasting/data/sample/sample_products.csv
+aposira/forecasting/data/sample/sample_sales.csv
+data/
+**/data/
+
+# Databases and binary state
+*.db
+*.sqlite*
+*.sqlite3
+
+# Model weights & binary artifacts
+*.pt
+*.onnx
+*.weights
+*.bin
+*.safetensors
+*.engine
+*.pkl
+*.joblib
+models/
+**/models/
+
+# Generated exports and reports
+exports/
+**/exports/
+reports/
+**/reports/
+*.xlsx
+*.pdf
+
+# Media (videos and images)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.jpg
+*.jpeg
+*.png
+snapshots/
+**/snapshots/
+uploads/
+**/uploads/
+
+# Virtual environments & caches
+.venv/
+.venv-*/
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Jupyter notebooks (to avoid indexing giant embedded outputs)
+*.ipynb
+
+# Logs
+*.log
+logs/
+
