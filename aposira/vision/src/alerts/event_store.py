@@ -1,5 +1,6 @@
 """Scoped, searchable 30-day event timeline with durable acknowledgements."""
 import json
+from contextlib import contextmanager
 import sqlite3
 import time
 from pathlib import Path
@@ -20,10 +21,15 @@ class EventStore:
             db.execute('CREATE INDEX IF NOT EXISTS events_scope_time ON events(organization_id,store_id,timestamp)')
         self.prune()
 
+    @contextmanager
     def connect(self):
         db=sqlite3.connect(self.path,timeout=30)
         db.row_factory=sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def prune(self):
         with self.connect() as db:

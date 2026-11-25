@@ -56,7 +56,7 @@ def _get_preprocessor() -> FramePreprocessor:
 
 
 def _get_bg_subtractor() -> Optional[BackgroundSubtractor]:
-    if not st.session_state.get("bg_enabled", False):
+    if not st.session_state.get("bg_enabled", True):
         return None
     method = st.session_state.get("bg_method", "MOG2")
     history = st.session_state.get("bg_history", 500)
@@ -64,7 +64,7 @@ def _get_bg_subtractor() -> Optional[BackgroundSubtractor]:
 
 
 def _get_line_detector() -> Optional[LineCrossingDetector]:
-    if not st.session_state.get("line_enabled", False):
+    if not st.session_state.get("line_enabled", True):
         return None
     if "line_detector" not in st.session_state:
         st.session_state["line_detector"] = LineCrossingDetector()
@@ -79,20 +79,20 @@ def _get_line_detector() -> Optional[LineCrossingDetector]:
 
 
 def _get_queue_detector() -> Optional[QueueDetector]:
-    if not st.session_state.get("queue_enabled", False):
+    if not st.session_state.get("queue_enabled", True):
         return None
     if "queue_detector" not in st.session_state:
         st.session_state["queue_detector"] = QueueDetector(queues=[
             QueueZone("checkout_q", "Checkout Queue",
                       polygon=[(600, 200), (900, 200), (900, 500), (600, 500)],
-                      min_queue_length=2, wait_threshold_seconds=30.0),
+                      min_queue_length=2, wait_threshold_seconds=10.0),
         ])
     return st.session_state["queue_detector"]
 
 
 def _get_object_detector():
     """Returns (ObjectLeftBehindDetector, ObjectRemovedDetector, [ShelfArea])"""
-    if not st.session_state.get("obj_enabled", False):
+    if not st.session_state.get("obj_enabled", True):
         return None, None, []
     if "obj_shelves" not in st.session_state:
         st.session_state["obj_shelves"] = [
@@ -101,8 +101,8 @@ def _get_object_detector():
             ShelfArea("shelf_b", "Shelf B",
                       polygon=[(500, 100), (750, 100), (750, 350), (500, 350)]),
         ]
-        st.session_state["olb"] = ObjectLeftBehindDetector(min_seconds=8.0)
-        st.session_state["orm"] = ObjectRemovedDetector(min_drop_ratio=0.3)
+        st.session_state["olb"] = ObjectLeftBehindDetector(min_seconds=5.0)
+        st.session_state["orm"] = ObjectRemovedDetector(min_drop_ratio=0.25)
     return st.session_state["olb"], st.session_state["orm"], st.session_state["obj_shelves"]
 
 
@@ -169,16 +169,16 @@ def render() -> Dict[str, Any]:
     with st.expander("🎬 Background Subtraction", expanded=False):
         c1, c2 = st.columns(2)
         with c1:
-            st.checkbox("Enable BG subtraction", False, key="bg_enabled")
+            st.checkbox("Enable BG subtraction", True, key="bg_enabled")
         with c2:
             st.selectbox("Method", ["MOG2", "KNN"], key="bg_method")
             st.slider("History", 50, 2000, 500, 50, key="bg_history")
-        if st.session_state.get("bg_enabled", False):
+        if st.session_state.get("bg_enabled", True):
             st.info("💡 Background mask will be displayed as a small overlay in the Live tab.")
 
     with st.expander("➡️ Line Crossing", expanded=False):
-        st.checkbox("Enable line crossing", False, key="line_enabled")
-        if st.session_state.get("line_enabled", False):
+        st.checkbox("Enable line crossing", True, key="line_enabled")
+        if st.session_state.get("line_enabled", True):
             det = _get_line_detector()
             st.caption(f"Active lines: {len(det.lines)}")
             with st.form("add_line"):
@@ -210,16 +210,16 @@ def render() -> Dict[str, Any]:
                 st.caption("No crossings yet.")
 
     with st.expander("🧍 Queue Detection", expanded=False):
-        st.checkbox("Enable queue detection", False, key="queue_enabled")
-        if st.session_state.get("queue_enabled", False):
+        st.checkbox("Enable queue detection", True, key="queue_enabled")
+        if st.session_state.get("queue_enabled", True):
             det = _get_queue_detector()
             for q in det.queues.values():
                 st.markdown(f"**{q.name}** — min {q.min_queue_length} ppl, wait ≥ {q.wait_threshold_seconds}s")
             st.caption("Queue status will be displayed in the Live tab.")
 
     with st.expander("📦 Object Monitor (left-behind / removed)", expanded=False):
-        st.checkbox("Enable object monitor", False, key="obj_enabled")
-        if st.session_state.get("obj_enabled", False):
+        st.checkbox("Enable object monitor", True, key="obj_enabled")
+        if st.session_state.get("obj_enabled", True):
             _, _, shelves = _get_object_detector()
             st.markdown("**Active shelves:**")
             for s in shelves:

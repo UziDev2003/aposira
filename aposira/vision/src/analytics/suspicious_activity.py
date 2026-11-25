@@ -792,9 +792,12 @@ class SuspiciousActivityDetector:
 
         # Optional pose estimation
         pose_estimates: Dict[int, Dict] = {}
-        if self.pose_analyzer and self.pose_analyzer.is_available and frame is not None:
+        if self.pose_analyzer and frame is not None:
             try:
-                pose_estimates = self.pose_analyzer.update(frame, tracks, ts)
+                if self.pose_analyzer.is_available:
+                    pose_estimates = self.pose_analyzer.update(frame, tracks, ts)
+                elif hasattr(self.pose_analyzer, "estimate"):
+                    pose_estimates = self.pose_analyzer.estimate(frame, tracks, ts)
             except Exception:
                 pose_estimates = {}
 

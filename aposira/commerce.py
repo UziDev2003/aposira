@@ -1,5 +1,6 @@
 """Transactional local retail store. Amounts are stored in integer paisa."""
 import json
+from contextlib import contextmanager
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
@@ -38,10 +39,15 @@ class Commerce:
             except sqlite3.OperationalError:
                 pass
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path, timeout=30)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     @staticmethod
     def scope(org, branch=None):

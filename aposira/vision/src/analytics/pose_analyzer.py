@@ -134,6 +134,109 @@ class PoseAnalyzer:
 
         return out
 
+    def estimate(self, frame, tracks: List[Any], timestamp: Optional[float] = None) -> Dict[int, Dict[str, Any]]:
+        """
+        Estimate pose keypoints and posture for each track.
+        Uses MediaPipe when available, and falls back to a fast OpenCV
+        silhouette/contour & bounding-box geometry heuristic when MediaPipe
+        is not installed so live pose/posture detection always works.
+        """
+        import time as _time
+        ts = timestamp if timestamp is not None else _time.time()
+        if self.is_available:
+            return self.update(frame, tracks, ts)
+        if frame is None or not tracks:
+            return {}
+
+        try:
+            import cv2
+            import numpy as _np
+        except Exception:
+            return {}
+
+        out: Dict[int, Dict[str, Any]] = {}
+        h, w = frame.shape[:2]
+        for t in tracks:
+            x1, y1, x2, y2 = t.bbox
+            bw = max(1, x2 - x1)
+            bh = max(1, y2 - y1)
+            cx = (x1 + x2) // 2
+            cy = (y1 + y2) // 2
+
+            # Aspect ratio (width / height): standing person is ~0.35-0.55; crouching/fallen is >0.68
+            aspect = bw / float(bh)
+            hist = getattr(t, "history", []) or []
+            y_drop = 0.0
+            if len(hist) >= 4:
+                early_y = sum(p[1][1] for p in hist[:3]) / 3.0
+                y_drop = cy - early_y  # positive means center moved down on screen
+
+            is_crouching = bool(aspect > 0.68 or y_drop > bh * 0.22)
+
+            # Analyze crop gradients to locate upper/lower body center of mass & arm extremities
+            cx1, cy1 = max(0, x1), max(0, y1)
+            cx2, cy2 = min(w, x2), min(h, y2)
+            crop = frame[cy1:cy2, cx1:cx2]
+
+            lean_offset = 0.0
+            left_wrist = (int(x1 + bw * 0.18), int(y1 + bh * 0.48))
+            right_wrist = (int(x1 + bw * 0.82), int(y1 + bh * 0.48))
+            left_elbow = (int(x1 + bw * 0.22), int(y1 + bh * 0.36))
+            right_elbow = (int(x1 + bw * 0.78), int(y1 + bh * 0.36))
+            head_pt = (cx, int(y1 + bh * 0.12))
+            left_shoulder = (int(x1 + bw * 0.28), int(y1 + bh * 0.24))
+            right_shoulder = (int(x1 + bw * 0.72), int(y1 + bh * 0.24))
+            hip_center = (cx, int(y1 + bh * 0.56))
+
+            if crop.size > 0 and crop.shape[0] >= 12 and crop.shape[1] >= 8:
+                try:
+                    gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                    edges = cv2.Canny(gray, 40, 120)
+                    ch, cw = edges.shape[:2]
+                    upper = edges[: max(1, ch // 2), :]
+                    lower = edges[max(1, ch // 2) :, :]
+                    u_xs = _np.where(upper > 0)[1]
+                    l_xs = _np.where(lower > 0)[1]
+                    if u_xs.size > 10 and l_xs.size > 10:
+                        u_mean = float(u_xs.mean()) / float(cw)
+                        l_mean = float(l_xs.mean()) / float(cw)
+                        lean_offset = u_mean - l_mean
+
+                    # Find leftmost and rightmost active edge points in upper-mid torsoband for wrists
+                    band_y1 = int(ch * 0.15)
+                    band_y2 = int(ch * 0.65)
+                    band = edges[band_y1:band_y2, :]
+                    ys, xs = _np.where(band > 0)
+                    if xs.size >= 8:
+                        l_idx = int(_np.argmin(xs))
+                        r_idx = int(_np.argmax(xs))
+                        left_wrist = (int(cx1 + xs[l_idx]), int(cy1 + band_y1 + ys[l_idx]))
+                        right_wrist = (int(cx1 + xs[r_idx]), int(cy1 + band_y1 + ys[r_idx]))
+                except Exception:
+                    pass
+
+            is_leaning = bool(abs(lean_offset) > 0.11)
+            conf = float(min(0.92, max(0.55, getattr(t, "confidence", 0.75))))
+
+            entry = {
+                "head": head_pt,
+                "left_shoulder": left_shoulder,
+                "right_shoulder": right_shoulder,
+                "left_elbow": left_elbow,
+                "right_elbow": right_elbow,
+                "left_wrist": left_wrist,
+                "right_wrist": right_wrist,
+                "hip_center": hip_center,
+                "is_crouching": is_crouching,
+                "is_leaning": is_leaning,
+                "confidence": conf,
+                "bbox": t.bbox,
+            }
+            out[t.track_id] = entry
+            self.pose_cache[t.track_id] = {**entry, "timestamp": ts}
+
+        return out
+
     def hand_near_polygon(self, hand_pos: Tuple[int, int], polygon: List[Tuple[int, int]],
                           max_distance_px: int = 80) -> float:
         """

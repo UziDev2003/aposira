@@ -1,5 +1,6 @@
 """Append-only stock movement ledger, scoped to organization, branch and SKU."""
 import math
+from contextlib import contextmanager
 import sqlite3
 from pathlib import Path
 
@@ -18,8 +19,14 @@ class StockLedger:
                 db.execute(f'''CREATE TRIGGER IF NOT EXISTS stock_no_{action.lower()} BEFORE {action} ON stock_movements
                     BEGIN SELECT RAISE(ABORT, 'Stock movements are immutable; add a correcting movement'); END''')
 
+    @contextmanager
     def connect(self):
-        return sqlite3.connect(self.path, timeout=30)
+        db = sqlite3.connect(self.path, timeout=30)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def record(self, organization_id, store_id, sku, quantity, reason, reference):
         if not all(isinstance(v, str) and v.strip() for v in (organization_id, store_id, sku, reason, reference)):

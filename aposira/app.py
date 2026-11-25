@@ -26,7 +26,9 @@ st.set_page_config(
 
 apply_theme()
 
-commerce = Commerce(ROOT / 'data/aposira.db')
+commerce = st.session_state.get('aposira_commerce')
+if commerce is None:
+    commerce = Commerce(ROOT / 'data/aposira.db')
 
 # Sidebar Navigation & Scope
 st.sidebar.title('APOSIRA')
@@ -326,6 +328,7 @@ elif page == 'POS & Orders':
                         st.session_state.checkout_receipt = next(
                             o for o in commerce.rows('orders', org, branch) if o['id'] == order_id
                         )
+                        st.rerun()
                     except ValueError as e:
                         st.error(str(e))
 
