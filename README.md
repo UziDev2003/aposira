@@ -95,3 +95,19 @@ tail -f /workspace/aposira-runpod.log
 Use `Ctrl+C` to stop following the log; the background application keeps running. After a successful first installation, `APOSIRA_INSTALL=0 bash run_runpod.sh` reuses the environment. Stop an already running APOSIRA process before launching another instance.
 
 The RunPod launcher derives the public proxy hostname from `RUNPOD_POD_ID` and keeps CORS/XSRF enabled. For a custom hostname, set `APOSIRA_PUBLIC_HOST=your-hostname` before launching. Use the HTTPS proxy URL from RunPod, even if Streamlit logs an HTTP URL with port 443.
+
+## Simulate a live RTSP camera
+
+Run `video_to_rtsp.py` on the same Pod as APOSIRA with a video file stored on that Pod:
+
+```bash
+python3 video_to_rtsp.py "/workspace/demo.mp4"
+```
+
+The standalone script uses FFmpeg and downloads a checksum-verified MediaMTX release when needed. It loops the file at normal playback speed and publishes `rtsp://127.0.0.1:8554/store`. In Store Vision, choose Live Stream, select RTSP, paste that URL, and press Start. Keep the script running while testing. Ctrl+C stops both processes. Server and publisher errors appear in the terminal and in the printed log directory.
+
+FFmpeg is included by `run_runpod.sh`. To install it separately on RunPod, use `apt-get update && apt-get install -y ffmpeg`. The script also supports Windows and macOS when FFmpeg is on PATH. Use `--port 8555` for another port, `--fps 10` to reduce encoding work, or `--duration 60` for a one-minute test.
+
+The default URL works for readers on the same machine. For a reader on another host, use `--bind 0.0.0.0` and a reachable TCP address/port. On RunPod, expose TCP port 8554 and use its external TCP IP and mapped port. APOSIRA's HTTPS proxy link serves the web UI. MediaMTX's RTSP stream uses its TCP listener.
+
+References: [MediaMTX FFmpeg publishing](https://mediamtx.org/docs/publish/ffmpeg), [MediaMTX configuration](https://mediamtx.org/docs/references/configuration-file).
