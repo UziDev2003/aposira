@@ -30,8 +30,16 @@ if command -v flock >/dev/null 2>&1; then
     flock -n 9 || { echo 'APOSIRA is already installing or running from this directory.' >&2; exit 1; }
 fi
 
+# Container-local storage avoids unpacking thousands of wheel files on /workspace.
+ENV_KEY="$(printf '%s' "$ROOT_DIR" | sha256sum | cut -c1-16)"
+ENV_ROOT="${APOSIRA_ENV_ROOT:-/tmp/aposira-envs}"
+VENV_DIR="$ENV_ROOT/$ENV_KEY"
+PYTHON_BIN="$VENV_DIR/bin/python"
+unset PYTHONPATH PYTHONHOME
+export PYTHONNOUSERSITE=1
+
 install_packages() {
-    "$ROOT_DIR/.venv-runpod/bin/python" -m pip install --no-input "$@" &
+    "$PYTHON_BIN" -m pip install --no-input --no-compile "$@" &
     local installer_pid=$!
     (
         while kill -0 "$installer_pid" 2>/dev/null; do
@@ -49,35 +57,53 @@ install_packages() {
     return "$result"
 }
 
-if [[ "${APOSIRA_INSTALL:-1}" == "1" ]]; then
-    echo '[1/4] Installing system dependencies...'
-    if [[ "$EUID" == '0' ]]; then
+REQUIREMENTS_KEY="$(cat requirements.txt requirements-ml.txt; python3 --version; printf 'runpod-env-v2')"
+REQUIREMENTS_KEY="$(printf '%s' "$REQUIREMENTS_KEY" | sha256sum | cut -d' ' -f1)"
+READY_FILE="$VENV_DIR/.aposira-ready"
+
+if [[ "${APOSIRA_INSTALL:-1}" == "1" ]] && { [[ ! -f "$READY_FILE" ]] || [[ "$(cat "$READY_FILE")" != "$REQUIREMENTS_KEY" ]]; }; then
+    echo '[1/4] Checking system dependencies...'
+    SYSTEM_PACKAGES=(python3-venv ffmpeg libsm6 libxext6 libgl1 libglib2.0-0 libgomp1 procps)
+    if [[ "$EUID" == '0' ]] && ! dpkg-query -W -f='${Status}\n' "${SYSTEM_PACKAGES[@]}" 2>/dev/null | awk '
+        $0 != "install ok installed" { missing=1 }
+        END { exit missing }
+    '; then
         apt-get update -qq
-        apt-get install -y python3-venv ffmpeg libsm6 libxext6 libgl1 libglib2.0-0 libgomp1 procps
-    else
-        echo 'Not root: system dependencies must already be installed.'
+        apt-get install -y "${SYSTEM_PACKAGES[@]}"
     fi
 
-    echo '[2/4] Installing APOSIRA and ML dependencies...'
-    # Re-running venv also disables global packages in an existing environment.
-    # This avoids pip trying to replace packages supplied by the container.
-    unset PYTHONPATH PYTHONHOME
-    export PYTHONNOUSERSITE=1
-    python3 -m venv .venv-runpod
-    install_packages --upgrade pip
-    install_packages -r requirements.txt -r requirements-ml.txt
+    echo "[2/4] Installing dependencies into container-local storage: $VENV_DIR"
+    mkdir -p "$ENV_ROOT"
+    python3 -m venv --system-site-packages "$VENV_DIR"
+    # Shadow the container's dateutil without attempting to uninstall it.
+    install_packages --ignore-installed --no-deps 'python-dateutil>=2.8,<3'
+    # Preserve the template's matching torch/torchvision build and CUDA runtime.
+    python3 - "$VENV_DIR/torch-constraints.txt" <<'PY'
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import sys
+constraints = []
+for package in ('torch', 'torchvision', 'torchaudio'):
+    try:
+        constraints.append(f'{package}=={version(package)}')
+    except PackageNotFoundError:
+        pass
+Path(sys.argv[1]).write_text('\n'.join(constraints) + '\n')
+print('Reusing container packages:', ', '.join(constraints) or 'no preinstalled PyTorch')
+PY
+    install_packages -c "$VENV_DIR/torch-constraints.txt" -r requirements.txt -r requirements-ml.txt
 else
-    echo '[1/4] Skipping system installation.'
-    echo '[2/4] Reusing the existing RunPod environment.'
+    echo '[1/4] Reusing system dependencies.'
+    echo '[2/4] Reusing installed Python dependencies.'
 fi
 
-PYTHON_BIN="$ROOT_DIR/.venv-runpod/bin/python"
 [[ -x "$PYTHON_BIN" ]] || { echo 'Run once with APOSIRA_INSTALL=1.' >&2; exit 1; }
-unset PYTHONPATH PYTHONHOME
-export PYTHONNOUSERSITE=1
-"$PYTHON_BIN" -m pip check
 "$PYTHON_BIN" -c 'import streamlit, pandas, numpy, openpyxl, cv2, ultralytics, lightgbm, prophet; print("APOSIRA dependency imports passed.")'
 "$PYTHON_BIN" -c 'import torch; print("CUDA available:", torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU mode")'
+
+if [[ "${APOSIRA_INSTALL:-1}" == "1" ]]; then
+    printf '%s' "$REQUIREMENTS_KEY" > "$READY_FILE"
+fi
 
 echo '[3/4] Stopping Jupyter to release port 8888...'
 # Stops Jupyter servers, without deleting notebooks or uninstalling packages.
