@@ -470,7 +470,11 @@ def _draw_rich_live_annotations(
 
     # 9. Bottom Live Event Ticker (shows latest 3 detected events right on the video)
     if activities_log:
-        recent_acts = activities_log[-3:][::-1]
+        recent_acts = sorted(
+            [activity for activity in activities_log if ts - activity.timestamp <= 15],
+            key=lambda activity: (SEVERITY_RANK[activity.severity], activity.timestamp),
+            reverse=True,
+        )[:3]
         bar_h = 22 * len(recent_acts) + 12
         y_top = max(120, out.shape[0] - bar_h - 6)
         ticker_bg = out.copy()
@@ -967,6 +971,8 @@ def process_video_batch(
                         timestamp=ts, frame=fr, detections=dets,
                         camera_id=camera_id,
                     )
+                    for detection_error in getattr(sus_detector, "last_errors", []):
+                        report_error("Suspicious activity rule", RuntimeError(detection_error))
                     for a in activities:
                         track = next((t for t in res.tracks if t.track_id == a.track_id), None)
                         bbox = track.bbox if track else None
@@ -1034,13 +1040,20 @@ def process_video_batch(
 
             writer.write(out)
 
+            concealment = getattr(sus_detector, "concealment", None)
+            concealment_candidates = 0
+            if concealment is not None:
+                concealment_candidates = sum(state["approached"] for state in concealment.tracks.values())
             live_telemetry = {
                 "frame": fc,
+                "timestamp": ts,
                 "total": max(total_frames, fc),
                 "fps": live_fps,
                 "tracks": len(res.tracks),
                 "unique_people": len(unique_track_ids),
                 "objects_now": len(object_dets),
+                "recognized_objects": sorted({item.class_name for item in object_dets}),
+                "concealment_candidates": concealment_candidates,
                 "objects_total": total_objects_seen,
                 "carried_now": sum(len(v) for v in carried_map.values()),
                 "pose_active": len(pose_ests),
@@ -1058,7 +1071,7 @@ def process_video_batch(
             # Bound browser updates to ten per second while analyzing every frame.
             if frame_callback:
                 now = time.monotonic()
-                if fc == 1 or now - last_frame_time >= 0.1:
+                if fc == 1 or fc == total_frames or now - last_frame_time >= 0.1:
                     frame_callback(out, live_telemetry)
                     last_frame_time = now
 
@@ -1331,6 +1344,11 @@ with tab_live:
                 existing_zones = _default_zones(960, 540)
                 st.caption("Using default zones (Store Entrance, Checkout, Restricted, Shelf A)")
 
+            st.info("Possible concealment alerts look for a visible shelf item moving toward a bag or torso and then becoming obscured. Align shelf zones with this video in Zone Editor. Possible unpaid exit also requires checkout and entrance/exit zones. Small or hidden items may be missed by the object detector. Review alerts against the footage.")
+            with st.expander("Active detection zones"):
+                st.dataframe([{"Zone": zone.name, "Type": zone.zone_type, "Polygon": str(zone.polygon)}
+                              for zone in existing_zones], hide_index=True, width="stretch")
+
             # Live Preview & Detection options (ENABLED BY DEFAULT)
             st.markdown("##### ⚙️ Live Preview & Detection Options")
             opt_c1, opt_c2 = st.columns(2)
@@ -1465,6 +1483,8 @@ with tab_live:
                                     subsys_placeholder.markdown(
                                         f"- 👥 **Active People:** `{info.get('tracks', 0)}` (Total: `{info.get('unique_people', 0)}`)\n"
                                         f"- 🎒 **Bags / Objects:** `{info.get('objects_now', 0)}` (`{info.get('carried_now', 0)}` carried)\n"
+                                        f"- **Recognized objects:** {', '.join(info.get('recognized_objects', [])) or 'None visible'}\n"
+                                        f"- **Concealment candidates:** `{info.get('concealment_candidates', 0)}`\n"
                                         f"- 🦴 **Pose Skeletons:** `{info.get('pose_active', 0)}` active\n"
                                         f"- ➡️ **Line Crossings:** In `{l_in}` / Out `{l_out}`\n"
                                         f"- 🧍 **Queue:** `{q_ppl}` ppl (Wait `{q_wait:.0f}s`)\n"
@@ -1482,10 +1502,13 @@ with tab_live:
                                         z_lines.append(f"{icon} **{zz.name}**: `{occ}{cap_str}` *(entries: {entries})*")
                                     zones_live_placeholder.markdown("\n\n".join(z_lines))
                                 if alerts_live_placeholder is not None:
-                                    acts = info.get("activities_log", [])
+                                    acts = [activity for activity in info.get("activities_log", [])
+                                            if info.get("timestamp", activity.timestamp) - activity.timestamp <= 15]
                                     if acts:
                                         a_lines = []
-                                        for a in acts[-5:][::-1]:
+                                        prioritized = sorted(acts, key=lambda activity: (
+                                            SEVERITY_RANK[activity.severity], activity.timestamp), reverse=True)
+                                        for a in prioritized[:5]:
                                             sev_v = a.severity.value if hasattr(a.severity, "value") else str(a.severity)
                                             badge = "🔴" if sev_v in ("HIGH", "CRITICAL") else ("🟠" if sev_v == "MEDIUM" else "🔵")
                                             a_lines.append(f"{badge} **[{sev_v}]** {a.message}")

@@ -132,3 +132,38 @@ def test_run_history_is_durable_scoped_and_records_failure(tmp_path):
     assert reopened.recent()[0]['frame'] == 7
     assert len(reopened.errors(run)) == 1
     assert reopened.errors(run)[0]['message'] == 'GPU failed'
+
+
+def test_concealment_reaches_live_feed_and_database(tmp_path):
+    from aposira.vision.src.alerts.alert_manager import AlertManager
+    from aposira.vision.src.analytics.suspicious_activity import SuspiciousActivityDetector
+    from aposira.vision.src.analytics.zone_analytics import Zone
+    from aposira.vision.src.detector.yolo_detector import Detection
+    from aposira.vision.src.tracker.bytetrack import Track
+    from aposira.vision.src.utils.config_schema import SuspiciousActivityConfig
+
+    process, arguments, capture, _ = pipeline(frames=7)
+    capture.get.side_effect = lambda prop: {1: 7, 2: 2, 3: 960, 4: 540}[prop]
+    person = Track(1, 0, 0.95, (20, 20, 120, 220), time.time())
+    arguments['trk'].update.return_value = SimpleNamespace(tracks=[person])
+    shelf = Zone('shelf', 'Shelf', 'shelf', [(110, 50), (160, 50), (160, 200), (110, 200)])
+    arguments['zones'] = [shelf]
+    arguments['zA'].zone_occ = {}
+    objects = [Detection(39, 'bottle', 0.95, (110, 115, 120, 125)),
+               Detection(39, 'bottle', 0.95, (65, 115, 75, 125))]
+    arguments['det'].detect.side_effect = [[objects[0]], [objects[1]], [], [], [], [], []]
+    config = SuspiciousActivityConfig()
+    for name in ('loitering', 'restricted_zone', 'shelf_tampering', 'abnormal_shelf',
+                 'unattended_checkout', 'movement', 'pose', 'possible_unpaid_exit'):
+        getattr(config.detectors, name).enabled = False
+    arguments['sus_detector'] = SuspiciousActivityDetector(config)
+    manager = AlertManager(snapshot_dir=tmp_path / 'snapshots', event_db=tmp_path / 'events.db',
+                           organization_id='shop', store_id='branch')
+    arguments['am'] = manager
+    feed = []
+    arguments['progress_callback'] = lambda percent, info: feed.extend(
+        event.activity_type.value for event in info['activities_log'])
+    result = process(**arguments)
+    assert result['suspicious_count'] == 1
+    assert 'possible_concealment' in feed
+    assert manager.event_store.query()[0]['alert_type'] == 'possible_concealment'

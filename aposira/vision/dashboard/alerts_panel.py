@@ -28,6 +28,8 @@ ACTIVITY_LABELS = {
     ActivityType.LOITERING.value: "🕐 Loitering",
     ActivityType.RESTRICTED_ZONE.value: "🚧 Restricted Zone",
     ActivityType.SHELF_TAMPERING.value: "🛒 Shelf Tampering",
+    ActivityType.POSSIBLE_CONCEALMENT.value: "🚨 Possible Concealment — Review",
+    ActivityType.POSSIBLE_UNPAID_EXIT.value: "🚨 Possible Unpaid Exit — Review",
     ActivityType.ABNORMAL_SHELF_INTERACTION.value: "🛍️ Abnormal Shelf",
     ActivityType.UNATTENDED_CHECKOUT.value: "🛒 Unattended Checkout",
     ActivityType.RUNNING.value: "🏃 Running",

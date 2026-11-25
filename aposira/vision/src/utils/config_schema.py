@@ -18,7 +18,7 @@ class ZoneConfig(BaseModel):
     """Polygon zone configuration."""
     id: str
     name: str
-    type: str = Field(default="general", description="entrance|checkout|restricted|shelf|general")
+    type: str = Field(default="general", description="entrance|exit|checkout|restricted|shelf|general")
     capacity: Optional[int] = None
     dwell_threshold: float = 120.0
     polygon: List[Tuple[int, int]]
@@ -33,7 +33,7 @@ class ZoneConfig(BaseModel):
     @field_validator("type")
     @classmethod
     def _validate_type(cls, v: str) -> str:
-        allowed = {"entrance", "checkout", "restricted", "shelf", "general"}
+        allowed = {"entrance", "exit", "checkout", "restricted", "shelf", "general"}
         if v not in allowed:
             raise ValueError(f"zone type must be one of {allowed}")
         return v
@@ -62,7 +62,7 @@ class RestrictedZoneConfig(BaseModel):
 
 class ShelfTamperingConfig(BaseModel):
     enabled: bool = True
-    min_motion_intensity: float = 0.3
+    min_motion_intensity: float = 0.03
     min_interaction_seconds: float = 5.0
     min_confidence: float = 0.7
     confirmation_frames: int = 8
@@ -99,6 +99,23 @@ class MovementConfig(BaseModel):
     cooldown_seconds: float = 30.0
 
 
+class PossibleUnpaidExitConfig(BaseModel):
+    enabled: bool = True
+    min_shelf_seconds: float = Field(default=2.0, ge=0)
+    min_carry_seconds: float = Field(default=1.0, ge=0)
+    confirmation_frames: int = Field(default=5, ge=1)
+    track_ttl_seconds: float = Field(default=30.0, gt=0)
+    cooldown_seconds: float = Field(default=60.0, ge=0)
+
+
+class PossibleConcealmentConfig(BaseModel):
+    enabled: bool = True
+    min_observation_frames: int = Field(default=2, ge=2)
+    min_hidden_seconds: float = Field(default=1.0, ge=0)
+    confirmation_frames: int = Field(default=5, ge=1)
+    cooldown_seconds: float = Field(default=60.0, ge=0)
+
+
 class PoseConfig(BaseModel):
     enabled: bool = True
     hand_near_shelf_max_px: int = 80
@@ -133,6 +150,8 @@ class DetectorConfigs(BaseModel):
     abnormal_shelf: AbnormalShelfConfig = AbnormalShelfConfig()
     unattended_checkout: UnattendedCheckoutConfig = UnattendedCheckoutConfig()
     movement: MovementConfig = MovementConfig()
+    possible_unpaid_exit: PossibleUnpaidExitConfig = PossibleUnpaidExitConfig()
+    possible_concealment: PossibleConcealmentConfig = PossibleConcealmentConfig()
     pose: PoseConfig = PoseConfig()
 
 

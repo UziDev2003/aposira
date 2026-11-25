@@ -45,6 +45,7 @@ ZONE_COLORS = {
     "shelf": "#ffff00",
     "entrance": "#00ffff",
     "general": "#ffffff",
+    "exit": "#ff8000",
 }
 
 ZONE_COLORS_BGR = {
@@ -53,6 +54,7 @@ ZONE_COLORS_BGR = {
     "shelf": (0, 255, 255),
     "entrance": (255, 255, 0),
     "general": (255, 255, 255),
+    "exit": (0, 128, 255),
 }
 
 

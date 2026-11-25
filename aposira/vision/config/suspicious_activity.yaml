@@ -21,7 +21,7 @@ detectors:
 
   shelf_tampering:
     enabled: true
-    min_motion_intensity: 0.3
+    min_motion_intensity: 0.03  # changed-pixel fraction near the person within the shelf
     min_interaction_seconds: 5.0
     min_confidence: 0.7
     confirmation_frames: 8
@@ -44,6 +44,21 @@ detectors:
     stationary_pixel_threshold: 800
     min_confidence: 0.65
     cooldown_seconds: 90.0
+
+  possible_concealment:
+    enabled: true
+    min_observation_frames: 2
+    min_hidden_seconds: 1.0
+    confirmation_frames: 5
+    cooldown_seconds: 60.0
+
+  possible_unpaid_exit:
+    enabled: true
+    min_shelf_seconds: 2.0
+    min_carry_seconds: 1.0
+    confirmation_frames: 5
+    track_ttl_seconds: 30.0
+    cooldown_seconds: 60.0
 
   movement:
     enabled: true

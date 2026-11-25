@@ -47,6 +47,8 @@ class ActivityType(Enum):
     LOITERING = "loitering"
     RESTRICTED_ZONE = "restricted_zone"
     SHELF_TAMPERING = "shelf_tampering"
+    POSSIBLE_UNPAID_EXIT = "possible_unpaid_exit"
+    POSSIBLE_CONCEALMENT = "possible_concealment"
     ABNORMAL_SHELF_INTERACTION = "abnormal_shelf_interaction"
     UNATTENDED_CHECKOUT = "unattended_checkout"
     RUNNING = "running"
@@ -476,6 +478,7 @@ class ShelfTamperingDetector:
         self.config = config
         self.confirm = ConfirmationCounter()
         self._prev_frame_gray: Dict[str, Any] = {}
+        self._interaction_started = {}
 
     def update(self, frame: np.ndarray, tracks: List[Any], zones: Dict[str, Any],
                zone_occ: Dict[str, Dict[int, float]], pose_estimates: Dict[int, Dict],
@@ -483,6 +486,11 @@ class ShelfTamperingDetector:
         if not self.config.enabled:
             return []
         out: List[SuspiciousActivity] = []
+        active_ids = {track.track_id for track in tracks}
+        self._interaction_started = {
+            key: started for key, started in self._interaction_started.items()
+            if key[0] != camera_id or key[2] in active_ids
+        }
         min_intensity = float(self.config.min_motion_intensity)
         min_dur = float(self.config.min_interaction_seconds)
         min_conf = float(self.config.min_confidence)
@@ -522,11 +530,23 @@ class ShelfTamperingDetector:
                     region_motion = float(vals.mean()) / 255.0
 
             for track in tracks:
-                if track.track_id not in zone_occ.get(zid, {}):
+                interaction_key = (camera_id, zid, track.track_id)
+                x1, y1, x2, y2 = (int(value) for value in track.bbox)
+                local_mask = mask[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                if not np.any(local_mask):
                     self.confirm.reset(("tamper", zid, track.track_id))
+                    self._interaction_started.pop(interaction_key, None)
                     continue
-                dwell = ts - zone_occ[zid][track.track_id]
-                motion_ok = region_motion >= min_intensity
+                started = self._interaction_started.setdefault(interaction_key, ts)
+                entered = zone_occ.get(zid, {}).get(track.track_id, started)
+                dwell = ts - entered
+                interaction_motion = region_motion
+                if motion_map is not None:
+                    local_motion = motion_map[max(0, y1):max(0, y2), max(0, x1):max(0, x2)]
+                    pixels = local_motion[local_mask > 0]
+                    if pixels.size:
+                        interaction_motion = float(np.mean(pixels >= 20))
+                motion_ok = interaction_motion >= min_intensity
                 dwell_ok = dwell >= min_dur
                 # Pose corroboration: hands near this zone
                 pose_score = 0.0
@@ -551,7 +571,7 @@ class ShelfTamperingDetector:
                 # Combine evidence
                 conf = 0.5
                 if motion_ok:
-                    conf += 0.2 * min(1.0, region_motion / max(min_intensity, 1e-3))
+                    conf += 0.2 * min(1.0, interaction_motion / max(min_intensity, 1e-3))
                 if pose_score > 0.4:
                     conf += 0.2 * pose_score
                 conf = min(0.95, conf)
@@ -569,7 +589,8 @@ class ShelfTamperingDetector:
                     camera_id=camera_id,
                     message=f"Possible shelf tampering at {getattr(zone, 'name', zid)}",
                     timestamp=ts,
-                    evidence={"motion_intensity": float(region_motion),
+                    evidence={"motion_intensity": float(interaction_motion),
+                              "shelf_mean_motion": float(region_motion),
                               "dwell_seconds": float(dwell),
                               "pose_score": float(pose_score)},
                     rule_violations=["shelf_tampering:motion_dwell"],
@@ -719,6 +740,167 @@ class UnattendedCheckoutDetector:
         return False
 
 
+class PossibleConcealmentDetector:
+    """Review a visible shelf item moving toward a bag/torso and becoming obscured."""
+    def __init__(self, config):
+        self.config = config
+        self.tracks = {}
+
+    def update(self, tracks, zones, detections, ts, cooldowns, camera_id):
+        if not self.config.enabled:
+            return []
+        active_ids = {track.track_id for track in tracks}
+        self.tracks = {key: state for key, state in self.tracks.items()
+                       if key[0] != camera_id or key[1] in active_ids}
+        shelves = [zone for zone in zones.values() if zone.zone_type == "shelf"]
+        bags = [item for item in detections if item.class_id in (24, 25, 26)]
+        items = [item for item in detections if item.class_id not in (0, 24, 25, 26)]
+        results = []
+        for track in tracks:
+            key = (camera_id, track.track_id)
+            state = self.tracks.get(key)
+            x1, y1, x2, y2 = track.bbox
+            width, height = max(x2 - x1, 1), max(y2 - y1, 1)
+            nearby = [item for item in items
+                      if x1 - width * 0.5 <= item.center[0] <= x2 + width * 0.5
+                      and y1 <= item.center[1] <= y2]
+            if state:
+                nearby = [item for item in nearby if item.class_id == state["class_id"]]
+            if nearby:
+                target = state["last_center"] if state else track.center
+                item = min(nearby, key=lambda obj: (obj.center[0] - target[0]) ** 2
+                           + (obj.center[1] - target[1]) ** 2)
+                ix, iy = item.center
+                torso = (x1 + width * 0.2 <= ix <= x2 - width * 0.2
+                         and y1 + height * 0.3 <= iy <= y1 + height * 0.85)
+                at_bag = any(bag.bbox[0] <= ix <= bag.bbox[2]
+                             and bag.bbox[1] <= iy <= bag.bbox[3] for bag in bags)
+                if state is None:
+                    shelf = next((zone for zone in shelves if zone.contains_point(item.center)), None)
+                    if shelf is None or torso or at_bag:
+                        continue
+                    state = {"class_id": item.class_id, "item": item.class_name,
+                             "shelf": shelf.zone_id, "first_center": item.center,
+                             "last_center": item.center, "observations": 0,
+                             "approached": False, "hidden_since": None,
+                             "hidden_frames": 0, "emitted": False,
+                             "confidence": min(float(track.confidence), float(item.confidence))}
+                    self.tracks[key] = state
+                displacement = ((ix - state["first_center"][0]) ** 2
+                                + (iy - state["first_center"][1]) ** 2) ** 0.5
+                state["observations"] += 1
+                state["last_center"] = item.center
+                state["approached"] = (torso or at_bag) and displacement >= width * 0.15
+                state["hidden_since"] = None
+                state["hidden_frames"] = 0
+                continue
+            if not state or not state["approached"] or state["emitted"]:
+                continue
+            if state["observations"] < self.config.min_observation_frames:
+                continue
+            if state["hidden_since"] is None:
+                state["hidden_since"] = ts
+            state["hidden_frames"] += 1
+            hidden_seconds = ts - state["hidden_since"]
+            if (hidden_seconds < self.config.min_hidden_seconds
+                    or state["hidden_frames"] < self.config.confirmation_frames):
+                continue
+            if not cooldowns.can_emit("possible_concealment", key, ts, self.config.cooldown_seconds):
+                continue
+            state["emitted"] = True
+            results.append(SuspiciousActivity(
+                activity_id=f"{camera_id}_concealment_{track.track_id}_{int(ts * 1000)}",
+                activity_type=ActivityType.POSSIBLE_CONCEALMENT,
+                severity=Severity.HIGH, confidence=state["confidence"],
+                track_id=track.track_id, zone_id=state["shelf"], zone_name=state["shelf"],
+                camera_id=camera_id, timestamp=ts,
+                message=f"Possible concealment: person #{track.track_id}'s {state['item']} moved from a shelf toward a bag/torso and became obscured. Review the video.",
+                evidence={"item_class": state["item"], "shelf_zone": state["shelf"],
+                          "observed_frames": state["observations"],
+                          "hidden_frames": state["hidden_frames"], "hidden_seconds": hidden_seconds,
+                          "first_item_position": state["first_center"],
+                          "last_item_position": state["last_center"],
+                          "person_still_tracked": True, "requires_review": True},
+                rule_violations=["possible_concealment:shelf_item_to_body_then_obscured"],
+            ))
+        return results
+
+
+class PossibleUnpaidExitDetector:
+    """Flag a shelf-to-exit sequence for review using visible carried-object evidence."""
+    def __init__(self, config):
+        self.config = config
+        self.tracks = {}
+
+    def update(self, tracks, zones, zone_occ, detections, ts, cooldowns, camera_id):
+        if not self.config.enabled:
+            return []
+        zone_types = {zone.zone_type for zone in zones.values()}
+        if not ({"shelf", "checkout"}.issubset(zone_types)
+                and zone_types.intersection({"entrance", "exit"})):
+            return []
+        self.tracks = {key: state for key, state in self.tracks.items()
+                       if ts - state["last_seen"] <= self.config.track_ttl_seconds}
+        results = []
+        objects = [d for d in detections if d.class_id != 0]
+        for track in tracks:
+            key = (camera_id, track.track_id)
+            state = self.tracks.setdefault(key, {
+                "last_seen": ts, "seen_empty": False, "shelf": None,
+                "shelf_seconds": 0.0, "carry_since": None, "carry_frames": 0,
+                "checkout_seen": False, "emitted": False,
+            })
+            state["last_seen"] = ts
+            inside = [zone for zone in zones.values() if zone.contains_point(track.center)]
+            x1, y1, x2, y2 = track.bbox
+            carried = [d for d in objects
+                       if x1 <= d.center[0] <= x2 and y1 <= d.center[1] <= y2]
+            for zone in inside:
+                if zone.zone_type == "shelf":
+                    entered = zone_occ.get(zone.zone_id, {}).get(track.track_id, ts)
+                    state["shelf_seconds"] = max(state["shelf_seconds"], ts - entered)
+                    state["shelf"] = zone.zone_id
+            if state["shelf"] and any(zone.zone_type == "checkout" for zone in inside):
+                state["checkout_seen"] = True
+            if not carried:
+                state["seen_empty"] = True
+                state["carry_since"] = None
+                state["carry_frames"] = 0
+                continue
+            if not state["seen_empty"] or state["shelf_seconds"] < self.config.min_shelf_seconds:
+                continue
+            if state["carry_since"] is None:
+                state["carry_since"] = ts
+            state["carry_frames"] += 1
+            if any(zone.zone_type == "checkout" for zone in inside):
+                state["checkout_seen"] = True
+            exits = [zone for zone in inside if zone.zone_type in ("entrance", "exit")]
+            if (not exits or any(zone.zone_type == "shelf" for zone in inside)
+                    or state["checkout_seen"] or state["emitted"]
+                    or state["carry_frames"] < self.config.confirmation_frames
+                    or ts - state["carry_since"] < self.config.min_carry_seconds):
+                continue
+            if not cooldowns.can_emit("possible_unpaid_exit", key, ts, self.config.cooldown_seconds):
+                continue
+            state["emitted"] = True
+            items = sorted({item.class_name for item in carried})
+            results.append(SuspiciousActivity(
+                activity_id=f"{camera_id}_unpaid_exit_{track.track_id}_{int(ts * 1000)}",
+                activity_type=ActivityType.POSSIBLE_UNPAID_EXIT,
+                severity=Severity.HIGH,
+                confidence=min(float(track.confidence), max(float(item.confidence) for item in carried)),
+                track_id=track.track_id, zone_id=exits[0].zone_id,
+                zone_name=exits[0].name, camera_id=camera_id, timestamp=ts,
+                message=f"Possible unpaid exit: person #{track.track_id} carried {', '.join(items)} from a shelf to an exit with no observed checkout visit. Review footage and payment records.",
+                evidence={"shelf_zone": state["shelf"], "shelf_seconds": state["shelf_seconds"],
+                          "carried_objects": items, "carry_frames": state["carry_frames"],
+                          "carry_seconds": ts - state["carry_since"], "checkout_visit_observed": False,
+                          "payment_verified": False},
+                rule_violations=["shelf_to_exit:carried_object_without_checkout"],
+            ))
+        return results
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -746,6 +928,9 @@ class SuspiciousActivityDetector:
         self.shelf_tamper = ShelfTamperingDetector(d.shelf_tampering)
         self.shelf_tamper.config._hand_max_px = d.pose.hand_near_shelf_max_px
         self.unattended = UnattendedCheckoutDetector(d.unattended_checkout)
+        self.unpaid_exit = PossibleUnpaidExitDetector(d.possible_unpaid_exit)
+        self.concealment = PossibleConcealmentDetector(d.possible_concealment)
+        self.last_errors = []
 
         self.anomaly_scorer = anomaly_scorer
         self.pose_analyzer = pose_analyzer
@@ -780,6 +965,7 @@ class SuspiciousActivityDetector:
     ) -> List[SuspiciousActivity]:
         ts = timestamp or time.time()
         activities: List[SuspiciousActivity] = []
+        self.last_errors = []
 
         # Optional multi-camera correlation
         global_ids: Dict[int, int] = {}
@@ -804,43 +990,43 @@ class SuspiciousActivityDetector:
         # 1) Restricted zone
         try:
             activities.extend(self.restricted.update(tracks, zones, ts, self.cooldowns, camera_id))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
 
         # 2) Loitering
         try:
             activities.extend(self.loitering.update(
                 tracks, zones, zone_occ, pose_estimates, ts, self.cooldowns, {}, camera_id))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
 
         # 3) Movement
         try:
             activities.extend(self.movement.update(tracks, ts, self.cooldowns, camera_id))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
 
         # 4) Shelf interaction
         try:
             activities.extend(self.shelf_inter.update(
                 tracks, zones, zone_occ, ts, self.cooldowns, camera_id))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
 
         # 5) Shelf tampering
         try:
             activities.extend(self.shelf_tamper.update(
                 frame, tracks, zones, zone_occ, pose_estimates, ts,
                 self.cooldowns, camera_id))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
 
         # 6) Unattended checkout
         try:
             activities.extend(self.unattended.update(
                 frame, tracks, zones, zone_occ, detections, ts, self.cooldowns, camera_id))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
 
         # 7) Custom rules
         try:
@@ -881,8 +1067,20 @@ class SuspiciousActivityDetector:
                         evidence={"rule": t["name"], "features": feats},
                         rule_violations=[f"custom:{t['name']}"],
                     ))
-        except Exception:
-            pass
+        except Exception as error:
+            self.last_errors.append(str(error))
+
+        try:
+            activities.extend(self.concealment.update(
+                tracks, zones, detections or [], ts, self.cooldowns, camera_id))
+        except Exception as error:
+            self.last_errors.append(f"Possible concealment: {error}")
+
+        try:
+            activities.extend(self.unpaid_exit.update(
+                tracks, zones, zone_occ, detections or [], ts, self.cooldowns, camera_id))
+        except Exception as error:
+            self.last_errors.append(f"Possible unpaid exit: {error}")
 
         # Apply global guards: anomaly gating, severity filter, dedup
         final: List[SuspiciousActivity] = []
