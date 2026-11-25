@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run inside your RunPod after uploading the complete APOSIRA workspace.
 set -euo pipefail
+trap 'echo "APOSIRA setup failed at line $LINENO. Review the error above, then rerun bash run_runpod.sh." >&2' ERR
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
@@ -23,6 +24,31 @@ for required in aposira/app.py requirements.txt requirements-ml.txt run_aposira.
     [[ -f "$required" ]] || { echo "Missing $required: upload the complete APOSIRA workspace." >&2; exit 1; }
 done
 
+# Hold the lock through startup so concurrent launchers cannot modify the same venv.
+if command -v flock >/dev/null 2>&1; then
+    exec 9>"$ROOT_DIR/.runpod-setup.lock"
+    flock -n 9 || { echo 'APOSIRA is already installing or running from this directory.' >&2; exit 1; }
+fi
+
+install_packages() {
+    "$ROOT_DIR/.venv-runpod/bin/python" -m pip install --no-input "$@" &
+    local installer_pid=$!
+    (
+        while kill -0 "$installer_pid" 2>/dev/null; do
+            sleep 20
+            if kill -0 "$installer_pid" 2>/dev/null; then
+                echo '[setup] pip is still running; large packages can take several minutes to install.'
+            fi
+        done
+    ) &
+    local progress_pid=$!
+    local result=0
+    wait "$installer_pid" || result=$?
+    kill "$progress_pid" 2>/dev/null || true
+    wait "$progress_pid" 2>/dev/null || true
+    return "$result"
+}
+
 if [[ "${APOSIRA_INSTALL:-1}" == "1" ]]; then
     echo '[1/4] Installing system dependencies...'
     if [[ "$EUID" == '0' ]]; then
@@ -33,9 +59,13 @@ if [[ "${APOSIRA_INSTALL:-1}" == "1" ]]; then
     fi
 
     echo '[2/4] Installing APOSIRA and ML dependencies...'
-    python3 -m venv --system-site-packages .venv-runpod
-    .venv-runpod/bin/python -m pip install --upgrade pip
-    .venv-runpod/bin/python -m pip install -r requirements.txt -r requirements-ml.txt
+    # Re-running venv also disables global packages in an existing environment.
+    # This avoids pip trying to replace packages supplied by the container.
+    unset PYTHONPATH PYTHONHOME
+    export PYTHONNOUSERSITE=1
+    python3 -m venv .venv-runpod
+    install_packages --upgrade pip
+    install_packages -r requirements.txt -r requirements-ml.txt
 else
     echo '[1/4] Skipping system installation.'
     echo '[2/4] Reusing the existing RunPod environment.'
@@ -43,6 +73,10 @@ fi
 
 PYTHON_BIN="$ROOT_DIR/.venv-runpod/bin/python"
 [[ -x "$PYTHON_BIN" ]] || { echo 'Run once with APOSIRA_INSTALL=1.' >&2; exit 1; }
+unset PYTHONPATH PYTHONHOME
+export PYTHONNOUSERSITE=1
+"$PYTHON_BIN" -m pip check
+"$PYTHON_BIN" -c 'import streamlit, pandas, numpy, openpyxl, cv2, ultralytics, lightgbm, prophet; print("APOSIRA dependency imports passed.")'
 "$PYTHON_BIN" -c 'import torch; print("CUDA available:", torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU mode")'
 
 echo '[3/4] Stopping Jupyter to release port 8888...'
